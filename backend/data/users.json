@@ -1,0 +1,60 @@
+[
+  {
+    "_id": "admin_id_default",
+    "name": "Admin",
+    "email": "admin@startupboxbd.com",
+    "password": "$2b$10$PeKkUJtGU8M/hNAOE.sDruBcgx.L49GQrW1W6IM1r/CXgGZoQu76q",
+    "role": "admin",
+    "createdAt": "2026-07-25T20:36:45.686Z"
+  },
+  {
+    "_id": "z5i0zvyvsms0v7l2m",
+    "name": "Taslim Naim",
+    "email": "taslimnaim@gmail.com",
+    "password": "$2b$10$LBJdp5CARjsoPZLQNO7H6.S1o48gXVS76h1tuTtWtq51VxLhKaoI6",
+    "role": "investor",
+    "createdAt": "2026-07-25T21:12:17.518Z"
+  },
+  {
+    "_id": "85pntom1zms35qiwe",
+    "name": "Taslim Naim",
+    "email": "test@gmail.com",
+    "password": "$2b$10$FXMwUih0HVEgmHYx/yKLe.HHVHwgzglkujRYR6KLSDXvna6ajeh.G",
+    "role": "investor",
+    "phone": "",
+    "address": "",
+    "profileImage": "",
+    "bankInfo": {
+      "method": "bkash",
+      "bkashNumber": "",
+      "bkashAccountType": "Personal",
+      "bankName": "",
+      "accountName": "",
+      "accountNumber": "",
+      "branch": "",
+      "routingNumber": ""
+    },
+    "createdAt": "2026-07-27T11:42:29.678Z"
+  },
+  {
+    "_id": "investor_id_default",
+    "name": "Demo Investor",
+    "email": "investor@startupboxbd.com",
+    "password": "$2b$10$3urudLGJPbizRrnB1iF2Nunz0LEkWbSKKNWATK8qdd27KtouIX3k2",
+    "role": "investor",
+    "phone": "01700000000",
+    "address": "Dhaka, Bangladesh",
+    "profileImage": "",
+    "bankInfo": {
+      "method": "bkash",
+      "bkashNumber": "01700000000",
+      "bkashAccountType": "Personal",
+      "bankName": "",
+      "accountName": "",
+      "accountNumber": "",
+      "branch": "",
+      "routingNumber": ""
+    },
+    "createdAt": "2026-07-28T09:55:39.836Z"
+  }
+]

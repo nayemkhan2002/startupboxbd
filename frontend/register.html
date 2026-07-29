@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — Startup Box Bangladesh</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+  <div class="auth-shell">
+    <aside class="auth-visual">
+      <a href="/" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <div>
+        <h2>Join Bangladesh’s growth marketplace</h2>
+        <p>Create an investor account to browse verified projects and express interest.</p>
+      </div>
+      <p style="font-size:0.85rem;color:rgba(255,255,255,0.4);">Free to register · No payment required</p>
+    </aside>
+
+    <main class="auth-panel">
+      <div class="auth-card">
+        <h1>Create an account</h1>
+        <p class="auth-lead">You’ll be registered as an investor by default.</p>
+        <div id="error-msg" class="error-msg"></div>
+        <form id="register-form">
+          <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" class="form-control" placeholder="Your name" required autocomplete="name">
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" id="email" class="form-control" placeholder="you@example.com" required autocomplete="email">
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" class="form-control" placeholder="Min. 6 characters" required minlength="6" autocomplete="new-password">
+          </div>
+          <button type="submit" class="btn btn-block">Create Account</button>
+        </form>
+        <p class="auth-footer-link">
+          Already have an account? <a href="/login.html">Login here</a>
+        </p>
+        <p class="auth-footer-link" style="margin-top:10px;"><a href="/">← Back to home</a></p>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const errorDiv = document.getElementById('error-msg');
+      const btn = e.target.querySelector('button[type="submit"]');
+
+      try {
+        btn.disabled = true;
+        btn.textContent = 'Creating…';
+        const data = await apiFetch('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ name, email, password })
+        });
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data));
+        showToast('Account created', 'success');
+        window.location.href = '/investor/dashboard.html';
+      } catch (err) {
+        errorDiv.textContent = err.message;
+        errorDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    });
+  </script>
+</body>
+</html>

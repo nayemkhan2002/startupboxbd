@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Investments — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>My Investments</h1>
+            <p class="welcome">Portfolio of admin-assigned projects</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="avatar" id="user-avatar">I</div>
+        </div>
+      </header>
+
+      <main class="app-content">
+        <div class="flex-between mb-3" style="flex-wrap:wrap;gap:12px;">
+          <div class="flex gap-2" id="filter-bar">
+            <button type="button" class="btn btn-sm filter-btn active" data-filter="all">All</button>
+            <button type="button" class="btn btn-outline btn-sm filter-btn" data-filter="active">Active</button>
+            <button type="button" class="btn btn-outline btn-sm filter-btn" data-filter="completed">Completed</button>
+            <button type="button" class="btn btn-outline btn-sm filter-btn" data-filter="pending">Pending</button>
+          </div>
+          <span class="text-muted" id="count-label">—</span>
+        </div>
+        <div class="investment-grid" id="investments-container"></div>
+      </main>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    let allInvestments = [];
+
+    const renderList = (filter = 'all') => {
+      const container = document.getElementById('investments-container');
+      const list = filter === 'all' ? allInvestments : allInvestments.filter((i) => i.status === filter);
+      document.getElementById('count-label').textContent = `${list.length} investment${list.length === 1 ? '' : 's'}`;
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="empty-state surface-card" style="grid-column:1/-1;">
+            <div class="empty-icon">◈</div>
+            <h3>No investments found</h3>
+            <p>Investments appear here after admin allocation.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map((inv) => `
+        <article class="investment-card">
+          <div class="investment-card-media">
+            ${inv.project?.thumbnail ? `<img src="${escapeHtml(inv.project.thumbnail)}" alt="">` : ''}
+          </div>
+          <div class="investment-card-body">
+            <div class="flex-between">
+              <span class="badge">${escapeHtml(inv.project?.category || 'Investment')}</span>
+              <span class="${invStatusClass(inv.status)}">${escapeHtml(inv.status)}</span>
+            </div>
+            <h3>${escapeHtml(inv.project?.title || 'Project')}</h3>
+            <p class="text-muted" style="font-size:0.85rem;">Invested on ${formatDate(inv.startDate)}</p>
+            <div class="inv-meta-grid">
+              <div class="cell"><small>Investment</small><strong>${formatMoney(inv.amount)}</strong></div>
+              <div class="cell"><small>Shares</small><strong>${inv.sharesCount ? Number(inv.sharesCount).toLocaleString() : '—'}</strong></div>
+              <div class="cell"><small>Expected Return</small><strong class="text-success">${formatMoney(inv.expectedReturn)}</strong></div>
+              <div class="cell"><small>Duration</small><strong>${escapeHtml(durationLabel(inv))}</strong></div>
+              <div class="cell"><small>Maturity</small><strong>${formatDate(inv.maturityDate)}</strong></div>
+              <div class="cell"><small>Earned</small><strong>${formatMoney(inv.returnEarned || (inv.status === 'completed' ? inv.expectedReturn : 0))}</strong></div>
+            </div>
+            <a class="btn btn-outline btn-block" href="/investor/investment.html?id=${encodeURIComponent(inv._id)}">View Details</a>
+          </div>
+        </article>`).join('');
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+      document.getElementById('app-nav').innerHTML = investorNav('investments');
+      document.getElementById('bottom-nav').innerHTML = investorBottomNav('investments');
+      renderAvatar(document.getElementById('user-avatar'), user);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.app-sidebar');
+
+      document.getElementById('filter-bar').addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter-btn');
+        if (!btn) return;
+        document.querySelectorAll('.filter-btn').forEach((b) => {
+          b.classList.toggle('active', b === btn);
+          b.classList.toggle('btn-outline', b !== btn);
+          if (b === btn) b.classList.remove('btn-outline');
+          else b.classList.add('btn');
+        });
+        renderList(btn.dataset.filter);
+      });
+
+      try {
+        allInvestments = await apiFetch('/investments/my');
+        renderList('all');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project Details — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh">
+        <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+        <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+      </a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>Project Opportunity</h1>
+            <p class="welcome"><a href="/investor/dashboard.html" style="color:var(--text-muted);">← Back to dashboard</a></p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="avatar" id="user-avatar">I</div>
+        </div>
+      </header>
+
+      <main class="app-content">
+        <div id="loading" class="panel panel-body">
+          <div class="skeleton skeleton-line lg"></div>
+          <div class="skeleton skeleton-line"></div>
+          <div class="skeleton skeleton-line" style="width:40%;"></div>
+          <p class="text-muted mt-2">Loading project details…</p>
+        </div>
+
+        <div id="project-content" style="display:none;">
+          <div class="mb-3">
+            <span class="badge" id="cat-badge"></span>
+            <h1 id="p-title" style="font-size:clamp(1.6rem,3vw,2.2rem);color:var(--navy);margin:12px 0 6px;"></h1>
+            <p id="p-deadline" class="text-gold" style="font-weight:700;"></p>
+          </div>
+
+          <div class="detail-layout">
+            <div>
+              <img id="p-banner" class="detail-banner hidden" alt="Project banner">
+              <div class="panel mt-2">
+                <div class="panel-header"><h2 id="lbl-overview">Business Overview</h2></div>
+                <div class="panel-body">
+                  <p id="p-desc" style="white-space:pre-line;font-size:1.05rem;color:var(--text-secondary);line-height:1.8;"></p>
+                </div>
+              </div>
+
+              <div class="panel mt-2" id="milestones-panel" style="display:none;">
+                <div class="panel-header"><h2>Milestones</h2></div>
+                <div class="panel-body">
+                  <ul class="milestones" id="milestones-list"></ul>
+                </div>
+              </div>
+
+              <div class="panel mt-2">
+                <div class="panel-header"><h2>Risk Analysis</h2></div>
+                <div class="panel-body">
+                  <p id="risk-copy" class="text-secondary"></p>
+                </div>
+              </div>
+            </div>
+
+            <aside>
+              <div class="summary-card">
+                <h3 style="margin-bottom:8px;color:var(--navy);">Investment Summary</h3>
+                <p class="text-muted" style="font-size:0.85rem;margin-bottom:16px;">Review terms, then express interest. No payment is taken on-platform.</p>
+
+                <div class="mb-2">
+                  <div class="progress"><div class="progress-bar" id="p-progress"></div></div>
+                  <div class="progress-meta">
+                    <span id="p-raised-label">Raised</span>
+                    <span id="p-pct">0%</span>
+                  </div>
+                </div>
+
+                <div class="summary-row">
+                  <span class="label">Expected ROI</span>
+                  <span class="value text-success" id="p-roi">—</span>
+                </div>
+                <div class="summary-row">
+                  <span class="label">Investment Target</span>
+                  <span class="value text-gold" id="p-target">—</span>
+                </div>
+                <div class="summary-row">
+                  <span class="label">Duration</span>
+                  <span class="value" id="p-duration">—</span>
+                </div>
+                <div class="summary-row">
+                  <span class="label">Risk</span>
+                  <span class="value"><span id="p-risk" class="risk-pill risk-medium"><span class="risk-dot"></span>Medium</span></span>
+                </div>
+                <div class="summary-row">
+                  <span class="label">Status</span>
+                  <span class="value" id="p-status"></span>
+                </div>
+
+                <form id="interest-form" class="mt-3">
+                  <h3 style="font-size:1.05rem;color:var(--navy);margin-bottom:12px;">Express Interest</h3>
+                  <div id="error-msg" class="error-msg"></div>
+                  <div id="success-msg" class="success-msg">Your expression of interest has been submitted!</div>
+                  <div class="form-group">
+                    <label for="amount">Intended Amount (৳)</label>
+                    <input type="number" id="amount" class="form-control" placeholder="e.g. 25000" required min="100" style="background:#fff;border-color:var(--border);color:var(--text);">
+                  </div>
+                  <div class="form-group">
+                    <label for="message">Message / Note (Optional)</label>
+                    <textarea id="message" class="form-control" rows="3" placeholder="Questions or notes for the team…" style="background:#fff;border-color:var(--border);color:var(--text);"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-block" id="btn-submit">Express Interest</button>
+                </form>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <nav class="mobile-bottom-nav">
+    <a href="/investor/dashboard.html"><span>▣</span>Home</a>
+    <a href="/investor/investments.html"><span>◈</span>Portfolio</a>
+    <a href="/investor/withdrawals.html"><span>⇄</span>Withdraw</a>
+    <a href="/investor/profile.html"><span>◉</span>Profile</a>
+  </nav>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const returnPath = `${window.location.pathname}${window.location.search}`;
+      let user = null;
+      try {
+        const userStr = localStorage.getItem('user');
+        user = userStr ? JSON.parse(userStr) : null;
+      } catch (_) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+
+      const isInvestor = user && user.role === 'investor';
+      const isAdmin = user && user.role === 'admin';
+
+      if (isInvestor) {
+        document.getElementById('app-nav').innerHTML = investorNav('explore');
+        renderAvatar(document.getElementById('user-avatar'), user);
+        document.getElementById('logout-btn').addEventListener('click', logout);
+      } else if (isAdmin) {
+        document.getElementById('app-nav').innerHTML = `
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Admin Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Manage Projects</a>`;
+        renderAvatar(document.getElementById('user-avatar'), user);
+        document.getElementById('logout-btn').addEventListener('click', logout);
+      } else {
+        document.getElementById('app-nav').innerHTML = `
+          <a href="/login.html?next=${encodeURIComponent(returnPath)}"><span class="nav-icon">→</span> Login</a>
+          <a href="/register.html"><span class="nav-icon">+</span> Register</a>`;
+        document.getElementById('logout-btn').style.display = 'none';
+        document.getElementById('user-avatar').textContent = '?';
+      }
+
+      initSidebarToggle('.app-sidebar');
+
+      const projectId = new URLSearchParams(window.location.search).get('id');
+      if (!projectId) {
+        showToast('No project specified', 'error');
+        window.location.href = isInvestor ? '/investor/explore.html' : '/';
+        return;
+      }
+
+      const riskCopy = {
+        Low: 'This opportunity is categorized as low risk based on the listed business model, timeline, and operator track record. Past performance is not a guarantee of future results.',
+        Medium: 'This opportunity carries moderate risk. Review duration, ROI expectations, and milestones carefully before expressing interest.',
+        High: 'This opportunity is higher risk. Capital and returns are not guaranteed. Express interest only after careful consideration.'
+      };
+
+      const setupInterestForm = () => {
+        const interestForm = document.getElementById('interest-form');
+        if (!interestForm) return;
+
+        if (isInvestor) {
+          interestForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = document.getElementById('amount').value;
+            const message = document.getElementById('message').value;
+            const btn = document.getElementById('btn-submit');
+
+            try {
+              btn.disabled = true;
+              btn.textContent = 'Submitting…';
+              await apiFetch('/interest', {
+                method: 'POST',
+                body: JSON.stringify({
+                  project: projectId,
+                  amountIntended: Number(amount),
+                  message
+                })
+              });
+              document.getElementById('success-msg').style.display = 'block';
+              document.getElementById('error-msg').style.display = 'none';
+              e.target.reset();
+              showToast('Interest submitted successfully', 'success');
+            } catch (err) {
+              document.getElementById('error-msg').textContent = err.message;
+              document.getElementById('error-msg').style.display = 'block';
+              document.getElementById('success-msg').style.display = 'none';
+              showToast(err.message, 'error');
+            } finally {
+              btn.disabled = false;
+              btn.textContent = 'Express Interest';
+            }
+          });
+          return;
+        }
+
+        interestForm.innerHTML = `
+          <h3 style="font-size:1.05rem;color:var(--navy);margin-bottom:12px;">Express Interest</h3>
+          <p class="text-muted" style="font-size:0.9rem;margin-bottom:16px;">
+            ${isAdmin
+              ? 'You are viewing as admin. Switch to an investor account to submit interest.'
+              : 'Log in as an investor to submit your interest in this project.'}
+          </p>
+          ${isAdmin
+            ? '<a href="/investor/explore.html" class="btn btn-outline btn-block">Browse as Investor</a>'
+            : `<a href="/login.html?next=${encodeURIComponent(returnPath)}" class="btn btn-block">Login to Express Interest</a>
+               <p class="auth-footer-link" style="margin-top:12px;text-align:center;">No account? <a href="/register.html">Register here</a></p>`}
+        `;
+      };
+
+      try {
+        const project = await apiFetch(`/projects/${projectId}`);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('project-content').style.display = 'block';
+
+        document.getElementById('p-title').textContent = project.title;
+        document.getElementById('cat-badge').textContent = project.category;
+        document.getElementById('p-deadline').textContent = project.deadline
+          ? 'Deadline: ' + new Date(project.deadline).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+          : '';
+        document.getElementById('p-desc').textContent = project.description;
+        document.getElementById('p-target').textContent = formatMoney(project.targetAmount);
+        document.getElementById('p-duration').textContent = project.duration || 'N/A';
+        document.getElementById('p-roi').textContent = project.expectedROI || 'N/A';
+        document.getElementById('p-status').innerHTML = projectStatusBadge(project.status);
+
+        const risk = project.riskLevel || 'Medium';
+        const riskEl = document.getElementById('p-risk');
+        riskEl.className = `risk-pill ${riskClass(risk)}`;
+        riskEl.innerHTML = `<span class="risk-dot"></span>${escapeHtml(risk)}`;
+        document.getElementById('risk-copy').textContent = riskCopy[risk] || riskCopy.Medium;
+
+        const pct = progressPct(project.raisedAmount, project.targetAmount);
+        document.getElementById('p-progress').style.width = pct + '%';
+        document.getElementById('p-pct').textContent = pct + '%';
+        document.getElementById('p-raised-label').textContent =
+          `${formatMoney(project.raisedAmount)} raised of ${formatMoney(project.targetAmount)}`;
+
+        const banner = document.getElementById('p-banner');
+        if (project.thumbnail) {
+          banner.src = project.thumbnail;
+          banner.classList.remove('hidden');
+        }
+
+        if (Array.isArray(project.milestones) && project.milestones.length) {
+          document.getElementById('milestones-panel').style.display = 'block';
+          document.getElementById('milestones-list').innerHTML =
+            project.milestones.map((m) => `<li>${escapeHtml(m)}</li>`).join('');
+        }
+
+        setupInterestForm();
+      } catch (err) {
+        document.getElementById('loading').innerHTML =
+          `<div class="empty-state"><h3>Unable to load project</h3><p>${escapeHtml(err.message)}</p></div>`;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interests & Investors — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investors.html" class="active"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;">System Admin</strong>
+            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);">admin@startupboxbd.com</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Interests & Investors</h2>
+            <p>Review expressions of interest and update lead status.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="lead-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Leads</div>
+          <div class="kpi-value accent" id="kpi-total">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Pending</div>
+          <div class="kpi-value" id="kpi-pending">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Contacted</div>
+          <div class="kpi-value success" id="kpi-contacted">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Investor</th>
+                <th>Project</th>
+                <th>Amount</th>
+                <th>Message</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="interests-table">
+              <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      const loadInterests = async () => {
+        try {
+          const interests = await apiFetch('/interest');
+          const tbody = document.getElementById('interests-table');
+
+          document.getElementById('kpi-total').textContent = interests.length;
+          document.getElementById('kpi-pending').textContent =
+            interests.filter((i) => i.status === 'pending').length;
+          document.getElementById('kpi-contacted').textContent =
+            interests.filter((i) => i.status === 'contacted').length;
+
+          if (!interests.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No interests yet</h3><p>Investor submissions will appear here.</p></div></td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = interests.map((i) => `
+            <tr>
+              <td>${new Date(i.submittedAt).toLocaleDateString('en-US')}</td>
+              <td>
+                <strong>${escapeHtml(i.investor ? i.investor.name : 'Unknown')}</strong><br>
+                <small class="text-muted">${escapeHtml(i.investor ? i.investor.email : '')}</small>
+              </td>
+              <td>${escapeHtml(i.project ? i.project.title : 'Deleted Project')}</td>
+              <td style="color:var(--gold);font-weight:700;">${formatMoney(i.amountIntended)}</td>
+              <td><small>${escapeHtml(i.message || '—')}</small></td>
+              <td>
+                <select class="status-select" data-id="${escapeHtml(i._id)}">
+                  <option value="pending" ${i.status === 'pending' ? 'selected' : ''}>Pending</option>
+                  <option value="reviewed" ${i.status === 'reviewed' ? 'selected' : ''}>Reviewed</option>
+                  <option value="contacted" ${i.status === 'contacted' ? 'selected' : ''}>Contacted</option>
+                  <option value="closed" ${i.status === 'closed' ? 'selected' : ''}>Closed</option>
+                </select>
+              </td>
+            </tr>`).join('');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      };
+
+      await loadInterests();
+
+      document.getElementById('interests-table').addEventListener('change', async (e) => {
+        if (!e.target.classList.contains('status-select')) return;
+        const id = e.target.getAttribute('data-id');
+        const newStatus = e.target.value;
+        try {
+          await apiFetch(`/interest/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: newStatus })
+          });
+          showToast(`Status updated to ${newStatus}`, 'success');
+          loadInterests();
+        } catch (err) {
+          showToast('Failed to update status: ' + err.message, 'error');
+          loadInterests();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

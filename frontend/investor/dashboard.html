@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investor Dashboard — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar" id="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>Welcome back, <span id="user-name">Investor</span></h1>
+            <p class="welcome">Your investment portfolio overview</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span class="account-chip" id="account-status">● Active</span>
+          <button type="button" class="icon-btn" title="Notifications" aria-label="Notifications">🔔</button>
+          <div class="avatar" id="user-avatar">I</div>
+        </div>
+      </header>
+
+      <main class="app-content">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon">৳</div>
+            <div class="kpi-label">Total Invested</div>
+            <div class="kpi-value accent" id="kpi-invested">—</div>
+            <div class="kpi-hint" id="kpi-shares-hint">Total Shares: —</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">◈</div>
+            <div class="kpi-label">Active Investments</div>
+            <div class="kpi-value" id="kpi-active">—</div>
+            <div class="kpi-hint">Currently running</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">↑</div>
+            <div class="kpi-label">Total Return Earned</div>
+            <div class="kpi-value success" id="kpi-earned">—</div>
+            <div class="kpi-hint">Credited returns</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">⇄</div>
+            <div class="kpi-label">Pending Withdrawals</div>
+            <div class="kpi-value" id="kpi-pending-wd">—</div>
+            <div class="kpi-hint">Awaiting admin action</div>
+          </div>
+        </div>
+
+        <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="font-size:1.2rem;color:var(--navy);">Recent Investments</h2>
+            <p class="text-muted" style="font-size:0.9rem;">Latest allocations in your portfolio</p>
+          </div>
+          <div class="flex gap-2">
+            <a href="/investor/withdrawals.html" class="btn btn-outline btn-sm">Request Withdrawal</a>
+            <a href="/investor/investments.html" class="btn btn-sm">View All</a>
+          </div>
+        </div>
+
+        <div class="investment-grid" id="recent-investments">
+          <div class="surface-card skeleton skeleton-card"></div>
+          <div class="surface-card skeleton skeleton-card"></div>
+        </div>
+
+        <div class="panel mt-3">
+          <div class="panel-header">
+            <h2>Interest Submissions</h2>
+            <a href="/investor/explore.html" class="btn btn-outline btn-sm">Explore Projects</a>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="interests-container"></tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+
+      document.getElementById('app-nav').innerHTML = investorNav('dashboard');
+      document.getElementById('bottom-nav').innerHTML = investorBottomNav('dashboard');
+      document.getElementById('user-name').textContent = user.name;
+      renderAvatar(document.getElementById('user-avatar'), user);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.app-sidebar');
+
+      const recentEl = document.getElementById('recent-investments');
+      const interestsEl = document.getElementById('interests-container');
+
+      try {
+        const [stats, investments, interests, profile] = await Promise.all([
+          apiFetch('/investments/stats'),
+          apiFetch('/investments/my'),
+          apiFetch('/interest/my'),
+          apiFetch('/profile/me')
+        ]);
+
+        syncLocalUser(profile);
+        renderAvatar(document.getElementById('user-avatar'), profile);
+
+        document.getElementById('kpi-invested').textContent = formatMoney(stats.totalInvested);
+        document.getElementById('kpi-shares-hint').textContent = `Total Shares: ${Number(stats.totalShares || 0).toLocaleString()}`;
+        document.getElementById('kpi-active').textContent = stats.activeInvestments;
+        document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
+        document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
+
+        const recent = investments.slice(0, 4);
+        if (!recent.length) {
+          recentEl.innerHTML = `
+            <div class="empty-state surface-card" style="grid-column:1/-1;">
+              <div class="empty-icon">◈</div>
+              <h3>No investments yet</h3>
+              <p>When admin assigns a project to you, it will appear here.</p>
+              <a href="/investor/explore.html" class="btn btn-sm mt-2">Express Interest in Projects</a>
+            </div>`;
+        } else {
+          recentEl.innerHTML = recent.map((inv) => {
+            const title = inv.project?.title || 'Project';
+            const thumb = inv.project?.thumbnail
+              ? `<img src="${escapeHtml(inv.project.thumbnail)}" alt="">`
+              : '';
+            return `
+              <article class="investment-card">
+                <div class="investment-card-media">${thumb}</div>
+                <div class="investment-card-body">
+                  <div class="flex-between">
+                    <span class="badge">${escapeHtml(inv.project?.category || 'Investment')}</span>
+                    <span class="${invStatusClass(inv.status)}">${escapeHtml(inv.status)}</span>
+                  </div>
+                  <h3>${escapeHtml(title)}</h3>
+                  <div class="inv-meta-grid">
+                    <div class="cell"><small>Invested</small><strong>${formatMoney(inv.amount)}</strong></div>
+                    <div class="cell"><small>Shares</small><strong>${inv.sharesCount ? Number(inv.sharesCount).toLocaleString() : '—'}</strong></div>
+                    <div class="cell"><small>Expected Return</small><strong class="text-success">${formatMoney(inv.expectedReturn)}</strong></div>
+                    <div class="cell"><small>Duration</small><strong>${escapeHtml(durationLabel(inv))}</strong></div>
+                  </div>
+                  <a class="btn btn-outline btn-block btn-sm" href="/investor/investment.html?id=${encodeURIComponent(inv._id)}">View Details</a>
+                </div>
+              </article>`;
+          }).join('');
+        }
+
+        if (!interests.length) {
+          interestsEl.innerHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:24px;"><p>No interest submissions yet.</p></div></td></tr>`;
+        } else {
+          interestsEl.innerHTML = interests.slice(0, 5).map((i) => `
+            <tr>
+              <td data-label="Project"><strong>${escapeHtml(i.project?.title || 'Deleted')}</strong></td>
+              <td data-label="Amount">${formatMoney(i.amountIntended)}</td>
+              <td data-label="Date">${formatDate(i.submittedAt)}</td>
+              <td data-label="Status"><span class="status-badge ${statusClass(i.status)}">${escapeHtml(i.status)}</span></td>
+            </tr>`).join('');
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+        recentEl.innerHTML = `<div class="empty-state surface-card" style="grid-column:1/-1;"><h3>Failed to load</h3><p>${escapeHtml(err.message)}</p></div>`;
+      }
+    });
+  </script>
+</body>
+</html>

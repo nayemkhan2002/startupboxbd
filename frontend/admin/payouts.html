@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profit Payouts — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+  <style>
+    .proof-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      object-fit: cover;
+      cursor: pointer;
+      border: 1px solid #cbd5e1;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-projects.html"><span class="nav-icon">➕</span> Assign Projects</a>
+          <a href="/admin/payouts.html" class="active"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Profit Payouts</h2>
+            <p>Record monthly profit transfers to investors and attach bank transfer receipts.</p>
+          </div>
+        </div>
+        <button class="btn" id="add-payout-btn">+ Record Profit Payout</button>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Investor</th>
+                <th>Project</th>
+                <th>Amount</th>
+                <th>Period</th>
+                <th>Method / Ref</th>
+                <th>Transfer Proof</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="payouts-table">
+              <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Submit Payout Modal -->
+  <div class="modal" id="payout-modal">
+    <div class="modal-content" style="max-width:560px;">
+      <h3 id="modal-title" style="margin-bottom:18px;">Record Profit Payout</h3>
+      <div id="error-msg" class="error-msg"></div>
+      <form id="payout-form">
+        <input type="hidden" id="screenshot-url">
+
+        <div class="form-group">
+          <label>Investor Profile</label>
+          <select id="investorId" class="form-control" required></select>
+        </div>
+
+        <div class="form-group">
+          <label>Project / Investment</label>
+          <select id="investmentId" class="form-control" required></select>
+        </div>
+
+        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;">
+            <label>Profit Amount (৳)</label>
+            <input type="number" id="amount" class="form-control" required min="1" placeholder="e.g. 5000">
+          </div>
+          <div style="flex:1;min-width:140px;">
+            <label>Month / Period</label>
+            <input type="text" id="monthYear" class="form-control" required placeholder="e.g. July 2026">
+          </div>
+        </div>
+
+        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;">
+            <label>Payment Method</label>
+            <select id="paymentMethod" class="form-control">
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="bKash">bKash</option>
+              <option value="Nagad">Nagad</option>
+              <option value="Cash">Cash</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:140px;">
+            <label>Payout Date</label>
+            <input type="date" id="payoutDate" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Bank Reference / TxID</label>
+          <input type="text" id="referenceNo" class="form-control" placeholder="e.g. TRX98273619283">
+        </div>
+
+        <div class="form-group">
+          <label>Bank Transfer Screenshot (Proof of Payment)</label>
+          <input type="file" id="screenshot-input" class="form-control" accept="image/*,.pdf">
+          <div class="image-preview-box mt-1" id="preview-box" style="height:100px;">
+            <span class="text-muted" id="preview-placeholder">No receipt image uploaded</span>
+            <img id="preview-img" style="max-height:90px;" alt="Receipt Preview">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Admin Notes (optional)</label>
+          <textarea id="notes" class="form-control" rows="2" placeholder="e.g. July profit share credited to Dutch-Bangla Bank account."></textarea>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-outline" id="cancel-btn">Cancel</button>
+          <button type="submit" class="btn" id="save-btn">Submit Payout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    let allPayouts = [];
+    let allInvestments = [];
+
+    const loadTable = async () => {
+      const tbody = document.getElementById('payouts-table');
+      try {
+        allPayouts = await apiFetch('/payouts');
+        if (!allPayouts.length) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No profit payouts recorded</h3><p>Click "+ Record Profit Payout" above to submit monthly profit proof.</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = allPayouts.map((p) => `
+          <tr>
+            <td>${formatDate(p.payoutDate)}</td>
+            <td><strong>${escapeHtml(p.investor?.name || '—')}</strong><br><small class="text-muted">${escapeHtml(p.investor?.email || '')}</small></td>
+            <td>${escapeHtml(p.project?.title || '—')}</td>
+            <td class="text-success"><strong>${formatMoney(p.amount)}</strong></td>
+            <td><span class="badge">${escapeHtml(p.monthYear || 'Monthly')}</span></td>
+            <td>${escapeHtml(p.paymentMethod || 'Bank')}<br><small class="text-muted">${escapeHtml(p.referenceNo || '')}</small></td>
+            <td>
+              ${p.screenshotUrl
+                ? `<a href="${escapeHtml(p.screenshotUrl)}" target="_blank"><img src="${escapeHtml(p.screenshotUrl)}" class="proof-thumb" alt="Proof"></a>`
+                : `<span class="text-muted" style="font-size:0.8rem;">No screenshot</span>`}
+            </td>
+            <td>
+              <button type="button" class="btn btn-danger btn-sm delete-btn" data-id="${escapeHtml(p._id)}">Delete</button>
+            </td>
+          </tr>`).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>Failed to load payouts</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+        showToast(err.message, 'error');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      const modal = document.getElementById('payout-modal');
+      const form = document.getElementById('payout-form');
+      const screenshotInput = document.getElementById('screenshot-input');
+      const previewImg = document.getElementById('preview-img');
+      const previewPlaceholder = document.getElementById('preview-placeholder');
+
+      screenshotInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          previewImg.src = ev.target.result;
+          previewImg.style.display = 'block';
+          previewPlaceholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      });
+
+      try {
+        const [investors, investments] = await Promise.all([
+          apiFetch('/profile/investors'),
+          apiFetch('/investments')
+        ]);
+        allInvestments = investments;
+
+        document.getElementById('investorId').innerHTML =
+          `<option value="">Select investor profile</option>` +
+          investors.map((i) => `<option value="${escapeHtml(i._id)}">${escapeHtml(i.name)} (${escapeHtml(i.email)})</option>`).join('');
+
+        document.getElementById('investorId').addEventListener('change', (e) => {
+          const selectedInvestorId = e.target.value;
+          const userInvestments = allInvestments.filter(i => i.investorId === selectedInvestorId);
+          document.getElementById('investmentId').innerHTML =
+            `<option value="">Select project investment</option>` +
+            userInvestments.map(i => `<option value="${escapeHtml(i._id)}" data-project="${escapeHtml(i.projectId || '')}">${escapeHtml(i.project?.title || 'Investment')} — ${formatMoney(i.amount)}</option>`).join('');
+        });
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+
+      const now = new Date();
+      const currentMonthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      document.getElementById('monthYear').value = currentMonthYear;
+      document.getElementById('payoutDate').value = now.toISOString().slice(0, 10);
+
+      await loadTable();
+
+      document.getElementById('add-payout-btn').addEventListener('click', () => {
+        form.reset();
+        document.getElementById('screenshot-url').value = '';
+        previewImg.style.display = 'none';
+        previewPlaceholder.style.display = 'block';
+        document.getElementById('monthYear').value = currentMonthYear;
+        document.getElementById('payoutDate').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('error-msg').style.display = 'none';
+        modal.style.display = 'block';
+      });
+
+      document.getElementById('cancel-btn').addEventListener('click', () => { modal.style.display = 'none'; });
+      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+      document.getElementById('payouts-table').addEventListener('click', async (e) => {
+        const deleteBtn = e.target.closest('.delete-btn');
+        if (deleteBtn) {
+          const ok = await confirmDialog('Delete this payout record? This will adjust the investor return balance.', { title: 'Delete Payout?', danger: true, confirmText: 'Delete' });
+          if (!ok) return;
+          try {
+            await apiFetch(`/payouts/${deleteBtn.dataset.id}`, { method: 'DELETE' });
+            showToast('Payout record deleted', 'success');
+            loadTable();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('save-btn');
+        const errorDiv = document.getElementById('error-msg');
+        const investmentSelect = document.getElementById('investmentId');
+        const selectedOpt = investmentSelect.options[investmentSelect.selectedIndex];
+        const projectId = selectedOpt ? selectedOpt.getAttribute('data-project') : '';
+
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Saving…';
+          errorDiv.style.display = 'none';
+
+          let screenshotUrl = '';
+          if (screenshotInput.files.length > 0) {
+            const formData = new FormData();
+            formData.append('screenshot', screenshotInput.files[0]);
+            const uploadRes = await apiFetch('/payouts/upload', { method: 'POST', body: formData });
+            screenshotUrl = uploadRes.screenshotUrl;
+          }
+
+          const body = {
+            investorId: document.getElementById('investorId').value,
+            investmentId: investmentSelect.value,
+            projectId,
+            amount: Number(document.getElementById('amount').value),
+            monthYear: document.getElementById('monthYear').value,
+            paymentMethod: document.getElementById('paymentMethod').value,
+            payoutDate: document.getElementById('payoutDate').value,
+            referenceNo: document.getElementById('referenceNo').value,
+            screenshotUrl,
+            notes: document.getElementById('notes').value
+          };
+
+          await apiFetch('/payouts', { method: 'POST', body: JSON.stringify(body) });
+          showToast('Profit payout recorded & receipt attached', 'success');
+          modal.style.display = 'none';
+          loadTable();
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Submit Payout';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

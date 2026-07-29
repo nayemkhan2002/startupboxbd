@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Explore Projects — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>Explore Projects</h1>
+            <p class="welcome">Express interest — admin allocates investments offline</p>
+          </div>
+        </div>
+        <div class="topbar-actions"><div class="avatar" id="user-avatar">I</div></div>
+      </header>
+
+      <main class="app-content">
+        <div class="projects-grid" id="projects-container">
+          <div class="surface-card skeleton skeleton-card"></div>
+          <div class="surface-card skeleton skeleton-card"></div>
+          <div class="surface-card skeleton skeleton-card"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+      document.getElementById('app-nav').innerHTML = investorNav('explore');
+      document.getElementById('bottom-nav').innerHTML = investorBottomNav('dashboard');
+      renderAvatar(document.getElementById('user-avatar'), user);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.app-sidebar');
+
+      const container = document.getElementById('projects-container');
+      try {
+        const projects = await apiFetch('/projects?status=open');
+        if (!projects.length) {
+          container.innerHTML = `<div class="empty-state surface-card" style="grid-column:1/-1;"><h3>No open projects</h3></div>`;
+          return;
+        }
+        container.innerHTML = projects.map((p) =>
+          projectCardHtml(p, {
+            href: `/investor/project.html?id=${encodeURIComponent(p._id)}`,
+            cta: 'View & Express Interest'
+          })
+        ).join('');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

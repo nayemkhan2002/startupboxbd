@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — Startup Box BD</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span
+                class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html" class="active"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Dashboard Overview</h2>
+            <p>Platform summary of projects and investor interest submissions.</p>
+          </div>
+        </div>
+        <div class="admin-top-actions">
+          <a href="/" target="_blank" class="btn btn-outline btn-sm">View Website</a>
+          <a href="/admin/projects.html" class="btn btn-sm">+ New Project</a>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Projects</div>
+          <div class="kpi-value" id="kpi-projects">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Open Projects</div>
+          <div class="kpi-value success" id="kpi-open-projects">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Interest Requests</div>
+          <div class="kpi-value accent" id="kpi-interests">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Unique Investors</div>
+          <div class="kpi-value" id="kpi-investors">—</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Project Category Distribution</h3>
+          <div class="bar-chart" id="chart-categories">
+            <div class="text-muted">Loading…</div>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Interest Status</h3>
+          <div class="bar-chart" id="chart-status">
+            <div class="text-muted">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel mt-3">
+        <div class="panel-header">
+          <h2>Quick Actions</h2>
+        </div>
+        <div class="panel-body flex gap-2" style="flex-wrap:wrap;">
+          <a href="/admin/projects.html" class="btn">Manage Projects</a>
+          <a href="/admin/investors.html" class="btn btn-outline">Review Interests</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    const renderBars = (el, items, colorClass = '') => {
+      if (!items.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:20px;"><p>No data yet</p></div>';
+        return;
+      }
+      const max = Math.max(...items.map((i) => i.count), 1);
+      el.innerHTML = items.map((i) => `
+        <div class="bar-row">
+          <div class="bar-label" title="${escapeHtml(i.label)}">${escapeHtml(i.label)}</div>
+          <div class="bar-track"><div class="bar-fill ${colorClass}" style="width:${Math.round((i.count / max) * 100)}%"></div></div>
+          <div class="bar-count">${i.count}</div>
+        </div>`).join('');
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      try {
+        const [projects, interests] = await Promise.all([
+          apiFetch('/projects'),
+          apiFetch('/interest')
+        ]);
+
+        document.getElementById('kpi-projects').textContent = projects.length;
+        document.getElementById('kpi-open-projects').textContent =
+          projects.filter((p) => p.status === 'open').length;
+        document.getElementById('kpi-interests').textContent = interests.length;
+
+        const investorIds = new Set(
+          interests.map((i) => (i.investor && (i.investor._id || i.investor)) || '').filter(Boolean)
+        );
+        document.getElementById('kpi-investors').textContent = investorIds.size;
+
+        const catMap = {};
+        projects.forEach((p) => {
+          const key = (p.category || 'Other').split('(')[0].trim() || 'Other';
+          const short = key.length > 22 ? key.slice(0, 20) + '…' : key;
+          catMap[short] = (catMap[short] || 0) + 1;
+        });
+        renderBars(
+          document.getElementById('chart-categories'),
+          Object.entries(catMap).map(([label, count]) => ({ label, count }))
+        );
+
+        const statusOrder = ['pending', 'reviewed', 'contacted', 'closed'];
+        const statusMap = { pending: 0, reviewed: 0, contacted: 0, closed: 0 };
+        interests.forEach((i) => {
+          const s = (i.status || 'pending').toLowerCase();
+          statusMap[s] = (statusMap[s] || 0) + 1;
+        });
+        const statusEl = document.getElementById('chart-status');
+        const maxS = Math.max(...Object.values(statusMap), 1);
+        const colorFor = { pending: 'warn', reviewed: 'blue', contacted: 'green', closed: 'gray' };
+        statusEl.innerHTML = statusOrder.map((label) => `
+          <div class="bar-row">
+            <div class="bar-label" style="text-transform:capitalize;">${label}</div>
+            <div class="bar-track"><div class="bar-fill ${colorFor[label]}" style="width:${Math.round((statusMap[label] / maxS) * 100)}%"></div></div>
+            <div class="bar-count">${statusMap[label]}</div>
+          </div>`).join('');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+
+</html>

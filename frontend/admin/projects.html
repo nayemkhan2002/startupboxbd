@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage Projects — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html" class="active"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;">System Admin</strong>
+            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);">admin@startupboxbd.com</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Manage Projects</h2>
+            <p>Create, edit, and publish investment opportunities.</p>
+          </div>
+        </div>
+        <button class="btn" id="add-btn">+ Create Project</button>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Image</th>
+                <th>Project Name</th>
+                <th>Category</th>
+                <th>Target</th>
+                <th>Total Shares</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="projects-table">
+              <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal" id="project-modal">
+    <div class="modal-content">
+      <h3 id="modal-title" style="margin-bottom:20px;">Create New Project</h3>
+      <div id="error-msg" class="error-msg"></div>
+      <form id="project-form">
+        <input type="hidden" id="project-id">
+        <input type="hidden" id="thumbnail-url">
+
+        <div class="form-group">
+          <label>Project Title</label>
+          <input type="text" id="title" class="form-control" placeholder="e.g. Broiler Project" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <input type="text" id="category" class="form-control" placeholder="e.g. Agriculture, Logistics" required>
+        </div>
+        <div class="form-group">
+          <label>Banner Image</label>
+          <input type="file" id="image-input" class="form-control" accept="image/*">
+          <div class="image-preview-box" id="preview-box">
+            <span class="text-muted" id="preview-placeholder">No image selected</span>
+            <img id="preview-img" alt="Preview">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="description" class="form-control" rows="4" placeholder="Project overview and terms…" required></textarea>
+        </div>
+        <div class="form-group" style="display:flex;gap:15px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:130px;">
+            <label>Target Amount (৳)</label>
+            <input type="number" id="targetAmount" class="form-control" required>
+          </div>
+          <div style="flex:1;min-width:130px;">
+            <label>Total Shares</label>
+            <input type="number" id="totalShares" class="form-control" placeholder="e.g. 1000" min="0">
+          </div>
+          <div style="flex:1;min-width:130px;">
+            <label>Duration</label>
+            <input type="text" id="duration" class="form-control" placeholder="e.g. 9 months" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Deadline</label>
+          <input type="date" id="deadline" class="form-control" required>
+        </div>
+        <div class="form-group" style="display:flex;gap:15px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;">
+            <label>Risk Level</label>
+            <select id="riskLevel" class="form-control">
+              <option value="Low">Low</option>
+              <option value="Medium">Medium</option>
+              <option value="High">High</option>
+            </select>
+          </div>
+          <div style="flex:1;min-width:140px;">
+            <label>Status</label>
+            <select id="status" class="form-control">
+              <option value="open">Open</option>
+              <option value="coming_soon">Coming Soon</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Milestones (one per line)</label>
+          <textarea id="milestones" class="form-control" rows="3" placeholder="Farm setup&#10;Operations&#10;Profit distribution"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+          <button type="button" class="btn btn-outline" id="cancel-btn">Cancel</button>
+          <button type="submit" class="btn" id="save-btn">Save Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      const modal = document.getElementById('project-modal');
+      const form = document.getElementById('project-form');
+      const imageInput = document.getElementById('image-input');
+      const previewImg = document.getElementById('preview-img');
+      const previewPlaceholder = document.getElementById('preview-placeholder');
+      const thumbnailUrlInput = document.getElementById('thumbnail-url');
+
+      imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          previewImg.src = ev.target.result;
+          previewImg.style.display = 'block';
+          previewPlaceholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const loadProjects = async () => {
+        try {
+          const projects = await apiFetch('/projects');
+          const tbody = document.getElementById('projects-table');
+          window.allProjects = projects;
+
+          if (!projects.length) {
+            tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No projects yet</h3><p>Create your first investment opportunity.</p></div></td></tr>`;
+            return;
+          }
+
+          tbody.innerHTML = projects.map((p) => `
+            <tr>
+              <td class="thumb-cell">
+                ${p.thumbnail
+                  ? `<img src="${escapeHtml(p.thumbnail)}" alt="">`
+                  : `<span class="text-muted" style="font-size:0.8rem;">No image</span>`}
+              </td>
+              <td><strong>${escapeHtml(p.title)}</strong></td>
+              <td>${escapeHtml(p.category || '')}</td>
+              <td>${formatMoney(p.targetAmount)}</td>
+              <td><strong>${p.totalShares ? Number(p.totalShares).toLocaleString() : '—'}</strong></td>
+              <td>${projectStatusBadge(p.status)}</td>
+              <td>
+                <div class="action-btns">
+                  <button type="button" class="btn btn-outline btn-sm edit-btn" data-id="${escapeHtml(p._id)}">Edit</button>
+                  <button type="button" class="btn btn-danger btn-sm delete-btn" data-id="${escapeHtml(p._id)}">Delete</button>
+                </div>
+              </td>
+            </tr>`).join('');
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      };
+
+      await loadProjects();
+
+      document.getElementById('add-btn').addEventListener('click', () => {
+        form.reset();
+        document.getElementById('project-id').value = '';
+        document.getElementById('totalShares').value = '';
+        thumbnailUrlInput.value = '';
+        previewImg.style.display = 'none';
+        previewPlaceholder.style.display = 'block';
+        document.getElementById('modal-title').textContent = 'Create New Project';
+        document.getElementById('error-msg').style.display = 'none';
+        modal.style.display = 'block';
+      });
+
+      document.getElementById('cancel-btn').addEventListener('click', () => {
+        modal.style.display = 'none';
+      });
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+      });
+
+      document.getElementById('projects-table').addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.edit-btn');
+        const deleteBtn = e.target.closest('.delete-btn');
+
+        if (editBtn) {
+          const id = editBtn.getAttribute('data-id');
+          const project = window.allProjects.find((p) => p._id === id);
+          if (!project) return;
+
+          document.getElementById('project-id').value = project._id;
+          document.getElementById('title').value = project.title;
+          document.getElementById('category').value = project.category;
+          document.getElementById('description').value = project.description;
+          document.getElementById('targetAmount').value = project.targetAmount;
+          document.getElementById('totalShares').value = project.totalShares || '';
+          document.getElementById('duration').value = project.duration || '';
+          document.getElementById('deadline').value = project.deadline ? String(project.deadline).split('T')[0] : '';
+          document.getElementById('status').value = project.status;
+          document.getElementById('riskLevel').value = project.riskLevel || 'Medium';
+          document.getElementById('milestones').value = Array.isArray(project.milestones)
+            ? project.milestones.join('\n') : '';
+          thumbnailUrlInput.value = project.thumbnail || '';
+          imageInput.value = '';
+
+          if (project.thumbnail) {
+            previewImg.src = project.thumbnail;
+            previewImg.style.display = 'block';
+            previewPlaceholder.style.display = 'none';
+          } else {
+            previewImg.style.display = 'none';
+            previewPlaceholder.style.display = 'block';
+          }
+
+          document.getElementById('modal-title').textContent = 'Edit Project';
+          document.getElementById('error-msg').style.display = 'none';
+          modal.style.display = 'block';
+        }
+
+        if (deleteBtn) {
+          const ok = await confirmDialog('This will permanently remove the project.', {
+            title: 'Delete project?',
+            confirmText: 'Delete',
+            danger: true
+          });
+          if (!ok) return;
+          try {
+            await apiFetch(`/projects/${deleteBtn.getAttribute('data-id')}`, { method: 'DELETE' });
+            showToast('Project deleted', 'success');
+            loadProjects();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const saveBtn = document.getElementById('save-btn');
+        const errorDiv = document.getElementById('error-msg');
+        const id = document.getElementById('project-id').value;
+
+        try {
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving…';
+          errorDiv.style.display = 'none';
+
+          let finalThumbnail = thumbnailUrlInput.value;
+          if (imageInput.files.length > 0) {
+            const formData = new FormData();
+            formData.append('image', imageInput.files[0]);
+            const uploadData = await apiFetch('/projects/upload', { method: 'POST', body: formData });
+            finalThumbnail = uploadData.imageUrl;
+          }
+
+          const milestonesRaw = document.getElementById('milestones').value.trim();
+          const milestones = milestonesRaw
+            ? milestonesRaw.split('\n').map((m) => m.trim()).filter(Boolean)
+            : [];
+
+          const body = {
+            title: document.getElementById('title').value,
+            category: document.getElementById('category').value,
+            description: document.getElementById('description').value,
+            thumbnail: finalThumbnail,
+            targetAmount: Number(document.getElementById('targetAmount').value),
+            totalShares: Number(document.getElementById('totalShares').value) || 0,
+            duration: document.getElementById('duration').value,
+            deadline: document.getElementById('deadline').value,
+            status: document.getElementById('status').value,
+            riskLevel: document.getElementById('riskLevel').value,
+            milestones
+          };
+
+          if (id) {
+            await apiFetch(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+            showToast('Project updated', 'success');
+          } else {
+            await apiFetch('/projects', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Project created', 'success');
+          }
+
+          modal.style.display = 'none';
+          loadProjects();
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.style.display = 'block';
+          showToast(err.message, 'error');
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Project';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

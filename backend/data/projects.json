@@ -1,0 +1,85 @@
+[
+  {
+    "_id": "proj_broiler",
+    "title": "প্রজেক্ট বয়লার (Broiler Poultry Project)",
+    "category": "পোল্ট্রি ও কৃষি (Poultry & Agriculture)",
+    "description": "স্টার্টআপ বক্স বাংলাদেশের অধীনে উন্নতমানের ব্রয়লার পোল্ট্রি ফার্মে বিনিয়োগ করুন। ৯ মাসের মেয়াদে লাভজনক রিটার্ন।",
+    "thumbnail": "",
+    "targetAmount": 25000,
+    "raisedAmount": 35000,
+    "duration": "৯ মাস",
+    "deadline": "2026-12-31",
+    "riskLevel": "Low",
+    "expectedROI": "১২৫০ - ১৫০০ ৳ (প্রতি মেয়াদ)",
+    "teamInfo": "Startup Box Bangladesh Farming Team",
+    "milestones": [
+      "ফার্ম প্রস্তুত ও বাচ্চা গ্রহণ",
+      "পোল্ট্রি লালন-পালন ও ভ্যাকসিনেশন",
+      "বাজারজাতকরণ ও মুনাফা বণ্টন"
+    ],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-07-26T00:00:00.000Z"
+  },
+  {
+    "_id": "proj_quickdrop",
+    "title": "কুইক ড্রপ পার্সেল প্রফিট লিস্ট (Quick Drop Parcel)",
+    "category": "লজিস্টিকস ও কুরিয়ার (Logistics)",
+    "description": "দ্রুতবর্ধনশীল কুরিয়ার ও পার্সেল ডেলিভারি নেটওয়ার্কে সংক্ষিপ্ত মেয়াদে ১ মাসের জন্য বিনিয়োগের সুযোগ।",
+    "thumbnail": "",
+    "targetAmount": 100000,
+    "raisedAmount": 65000,
+    "duration": "১ মাস",
+    "deadline": "2026-08-31",
+    "riskLevel": "Low",
+    "expectedROI": "৩০০০ - ৪০০০ ৳ (মাসিক)",
+    "teamInfo": "Quick Drop Parcel Management",
+    "milestones": [
+      "হাব সম্প্রসারণ",
+      "ডেলিভারি ভেহিকল সংযোজন",
+      "মাসিক প্রফিট ডিসট্রিবিউশন"
+    ],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-07-26T00:00:00.000Z"
+  },
+  {
+    "_id": "proj_banana",
+    "title": "প্রজেক্ট কলাগাছ (Banana Plantation)",
+    "category": "কৃষি ও এগ্রো (Agriculture)",
+    "description": "আগ্রাসী চাহিদাসম্পন্ন কলা চাষ প্রকল্পে ৯ মাসের জন্য সরাসরি বিনিয়োগের নিশ্চিত ও লাভজনক সুযোগ।",
+    "thumbnail": "",
+    "targetAmount": 13000,
+    "raisedAmount": 9000,
+    "duration": "৯ মাস",
+    "deadline": "2026-11-30",
+    "riskLevel": "Low",
+    "expectedROI": "৩২০০ - ৩৯০০ ৳ (প্রতি মেয়াদ)",
+    "teamInfo": "Startup Box Bangladesh Agro Wing",
+    "milestones": [
+      "জমি নির্বাচন ও চারা রোপণ",
+      "পরিচর্যা ও সার প্রয়োগ",
+      "ফসল সংগ্রহ ও বাজারজাতকরণ"
+    ],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-07-26T00:00:00.000Z"
+  },
+  {
+    "_id": "tjjr8tqjhms0v1gm7",
+    "title": "hi",
+    "category": "hi",
+    "description": "hi",
+    "thumbnail": "/assets/uploads/project_1785013651780.jfif",
+    "targetAmount": 20000,
+    "raisedAmount": 0,
+    "deadline": "2026-07-31",
+    "riskLevel": "Low",
+    "expectedROI": "200",
+    "teamInfo": "",
+    "milestones": [],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-07-25T21:07:31.807Z"
+  }
+]

@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profit Payouts — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+  <style>
+    .receipt-preview-thumb {
+      width: 48px;
+      height: 48px;
+      border-radius: 6px;
+      object-fit: cover;
+      cursor: pointer;
+      border: 1px solid var(--border-color, #e2e8f0);
+    }
+    .receipt-modal-img {
+      max-width: 100%;
+      max-height: 70vh;
+      border-radius: 8px;
+      object-fit: contain;
+      display: block;
+      margin: 12px auto 0;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>Profit Payouts</h1>
+            <p class="welcome">Monthly profit disbursements & bank transfer receipts</p>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <div class="avatar" id="user-avatar">I</div>
+        </div>
+      </header>
+
+      <main class="app-content">
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon">৳</div>
+            <div class="kpi-label">Total Profit Received</div>
+            <div class="kpi-value success" id="kpi-total-profit">—</div>
+            <div class="kpi-hint">Directly credited to profile</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">📜</div>
+            <div class="kpi-label">Total Disbursements</div>
+            <div class="kpi-value" id="kpi-payout-count">—</div>
+            <div class="kpi-hint">Recorded bank transfers</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon">📅</div>
+            <div class="kpi-label">Latest Payout Date</div>
+            <div class="kpi-value" id="kpi-latest-date" style="font-size:1.1rem;padding-top:4px;">—</div>
+            <div class="kpi-hint">Most recent profit transfer</div>
+          </div>
+        </div>
+
+        <div class="panel mt-3">
+          <div class="panel-header flex-between" style="flex-wrap:wrap;gap:10px;">
+            <h2>Profit Disbursement Statements</h2>
+            <span class="text-muted" id="payout-count-label">—</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Month / Period</th>
+                  <th>Project</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Reference / Note</th>
+                  <th>Transfer Proof</th>
+                </tr>
+              </thead>
+              <tbody id="payouts-table">
+                <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+
+  <!-- Screenshot Lightbox Modal -->
+  <div class="modal" id="receipt-modal">
+    <div class="modal-content" style="max-width:650px;">
+      <div class="flex-between">
+        <h3 id="receipt-modal-title">Bank Transfer Receipt</h3>
+        <button type="button" class="btn btn-outline btn-sm" id="close-receipt-btn">Close</button>
+      </div>
+      <div id="receipt-modal-body">
+        <img id="receipt-img" class="receipt-modal-img" src="" alt="Bank Transfer Receipt">
+        <div class="mt-2 text-muted" style="font-size:0.88rem;text-align:center;" id="receipt-details"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    let allPayouts = [];
+
+    const showReceiptModal = (payout) => {
+      const modal = document.getElementById('receipt-modal');
+      const img = document.getElementById('receipt-img');
+      const title = document.getElementById('receipt-modal-title');
+      const details = document.getElementById('receipt-details');
+
+      title.textContent = `Bank Transfer Receipt — ${payout.monthYear || 'Profit Payout'}`;
+      img.src = payout.screenshotUrl;
+      details.innerHTML = `
+        <strong>${escapeHtml(payout.project?.title || 'Project')}</strong> | 
+        Amount: <strong>${formatMoney(payout.amount)}</strong> | 
+        Method: <strong>${escapeHtml(payout.paymentMethod)}</strong>
+        ${payout.referenceNo ? `<br>Ref: <code>${escapeHtml(payout.referenceNo)}</code>` : ''}`;
+      modal.style.display = 'block';
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+
+      document.getElementById('app-nav').innerHTML = investorNav('payouts');
+      document.getElementById('bottom-nav').innerHTML = investorBottomNav('payouts');
+      renderAvatar(document.getElementById('user-avatar'), user);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.app-sidebar');
+
+      const receiptModal = document.getElementById('receipt-modal');
+      document.getElementById('close-receipt-btn').addEventListener('click', () => { receiptModal.style.display = 'none'; });
+      receiptModal.addEventListener('click', (e) => { if (e.target === receiptModal) receiptModal.style.display = 'none'; });
+
+      try {
+        allPayouts = await apiFetch('/payouts/my');
+        const tbody = document.getElementById('payouts-table');
+        document.getElementById('payout-count-label').textContent = `${allPayouts.length} statement${allPayouts.length === 1 ? '' : 's'}`;
+
+        const totalProfit = allPayouts.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        document.getElementById('kpi-total-profit').textContent = formatMoney(totalProfit);
+        document.getElementById('kpi-payout-count').textContent = allPayouts.length;
+        document.getElementById('kpi-latest-date').textContent = allPayouts.length ? formatDate(allPayouts[0].payoutDate) : '—';
+
+        if (!allPayouts.length) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7">
+                <div class="empty-state surface-card" style="padding:32px;">
+                  <div class="empty-icon">💰</div>
+                  <h3>No profit disbursements yet</h3>
+                  <p>When admin transfers monthly profit, statements and bank receipts will appear here.</p>
+                </div>
+              </td>
+            </tr>`;
+          return;
+        }
+
+        tbody.innerHTML = allPayouts.map((p) => `
+          <tr>
+            <td data-label="Date"><strong>${formatDate(p.payoutDate)}</strong></td>
+            <td data-label="Month / Period">
+              <span class="badge" style="background:var(--bg-subtle,#edf2f7);color:var(--navy);font-weight:600;">
+                ${escapeHtml(p.monthYear || 'Monthly')}
+              </span>
+            </td>
+            <td data-label="Project"><strong>${escapeHtml(p.project?.title || '—')}</strong></td>
+            <td data-label="Amount" class="text-success"><strong>${formatMoney(p.amount)}</strong></td>
+            <td data-label="Method">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
+            <td data-label="Reference / Note">
+              ${p.referenceNo ? `<code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;">${escapeHtml(p.referenceNo)}</code><br>` : ''}
+              <small class="text-muted">${escapeHtml(p.notes || '')}</small>
+            </td>
+            <td data-label="Transfer Proof">
+              ${p.screenshotUrl ? `
+                <button type="button" class="btn btn-outline btn-sm view-proof-btn" data-id="${escapeHtml(p._id)}">
+                  🖼️ View Receipt
+                </button>` : `<span class="text-muted" style="font-size:0.82rem;">No receipt attached</span>`}
+            </td>
+          </tr>`).join('');
+
+        tbody.addEventListener('click', (e) => {
+          const btn = e.target.closest('.view-proof-btn');
+          if (!btn) return;
+          const item = allPayouts.find(p => p._id === btn.dataset.id);
+          if (item && item.screenshotUrl) {
+            showReceiptModal(item);
+          }
+        });
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        const tbody = document.getElementById('payouts-table');
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state surface-card" style="padding:32px;"><h3>Failed to load</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

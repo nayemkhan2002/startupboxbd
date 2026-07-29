@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Withdrawals — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html" class="active"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Withdrawal Requests</h2>
+            <p>Approve, process, complete, or reject investor payout requests.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Investor</th>
+                <th>Amount</th>
+                <th>Method</th>
+                <th>Payment Info</th>
+                <th>Status</th>
+                <th>Admin Note</th>
+              </tr>
+            </thead>
+            <tbody id="withdrawals-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    const paymentInfoHtml = (w) => {
+      const p = w.paymentInfo || {};
+      if (w.method === 'bkash') {
+        return `<small><strong>bKash:</strong> ${escapeHtml(p.bkashNumber || '—')}<br>${escapeHtml(p.accountName || '')} (${escapeHtml(p.bkashAccountType || '')})</small>`;
+      }
+      return `<small><strong>${escapeHtml(p.bankName || 'Bank')}</strong><br>${escapeHtml(p.accountName || '')}<br>A/C ${escapeHtml(p.accountNumber || '')}<br>${escapeHtml(p.branch || '')}</small>`;
+    };
+
+    const loadTable = async () => {
+      const list = await apiFetch('/withdrawals');
+      const tbody = document.getElementById('withdrawals-table');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No withdrawal requests</h3></div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map((w) => `
+        <tr>
+          <td>${formatDate(w.createdAt)}</td>
+          <td><strong>${escapeHtml(w.investor?.name || '—')}</strong><br><small class="text-muted">${escapeHtml(w.investor?.email || '')}</small></td>
+          <td style="color:var(--gold);font-weight:700;">${formatMoney(w.amount)}</td>
+          <td>${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
+          <td>${paymentInfoHtml(w)}</td>
+          <td>
+            <select class="status-select" data-id="${escapeHtml(w._id)}">
+              ${['pending','approved','processing','completed','rejected'].map((s) =>
+                `<option value="${s}" ${w.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+            </select>
+          </td>
+          <td>
+            <input type="text" class="form-control note-input" data-id="${escapeHtml(w._id)}" value="${escapeHtml(w.adminNote || '')}" placeholder="Add note…" style="min-width:140px;padding:8px 10px;font-size:0.85rem;">
+          </td>
+        </tr>`).join('');
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      await loadTable();
+
+      document.getElementById('withdrawals-table').addEventListener('change', async (e) => {
+        if (e.target.classList.contains('status-select')) {
+          try {
+            await apiFetch(`/withdrawals/${e.target.dataset.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ status: e.target.value })
+            });
+            showToast(`Status → ${e.target.value}`, 'success');
+          } catch (err) {
+            showToast(err.message, 'error');
+            loadTable();
+          }
+        }
+      });
+
+      document.getElementById('withdrawals-table').addEventListener('change', async (e) => {
+        if (e.target.classList.contains('note-input')) {
+          try {
+            await apiFetch(`/withdrawals/${e.target.dataset.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ adminNote: e.target.value })
+            });
+            showToast('Note saved', 'success');
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>

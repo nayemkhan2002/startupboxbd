@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security — Startup Box BD</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <a href="/investor/dashboard.html" class="brand-logo" aria-label="Startup Box Bangladesh"><img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img"><span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span></a>
+      <nav class="app-nav" id="app-nav"></nav>
+      <div class="app-sidebar-footer">
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn">Logout</button>
+      </div>
+    </aside>
+
+    <div class="app-main">
+      <header class="app-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1>Security</h1>
+            <p class="welcome">Password & account protection</p>
+          </div>
+        </div>
+        <div class="topbar-actions"><div class="avatar" id="user-avatar">I</div></div>
+      </header>
+
+      <main class="app-content">
+        <div class="panel" style="max-width:520px;">
+          <div class="panel-header"><h2>Change Password</h2></div>
+          <div class="panel-body">
+            <form id="password-form">
+              <div class="form-group">
+                <label>Current Password</label>
+                <input type="password" id="currentPassword" class="form-control" required autocomplete="current-password">
+              </div>
+              <div class="form-group">
+                <label>New Password</label>
+                <input type="password" id="newPassword" class="form-control" required minlength="6" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" id="confirmPassword" class="form-control" required minlength="6" autocomplete="new-password">
+              </div>
+              <button type="submit" class="btn" id="save-btn">Update Password</button>
+            </form>
+          </div>
+        </div>
+
+        <div class="panel mt-3" style="max-width:520px;">
+          <div class="panel-header"><h2>Session</h2></div>
+          <div class="panel-body">
+            <p class="text-muted" style="margin-bottom:14px;">Sign out of this device if you are finished managing your portfolio.</p>
+            <button type="button" class="btn btn-outline" id="logout-btn-2">Logout</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div id="bottom-nav"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+      document.getElementById('app-nav').innerHTML = investorNav('security');
+      document.getElementById('bottom-nav').innerHTML = investorBottomNav('profile');
+      renderAvatar(document.getElementById('user-avatar'), user);
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      document.getElementById('logout-btn-2').addEventListener('click', logout);
+      initSidebarToggle('.app-sidebar');
+
+      document.getElementById('password-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const currentPassword = document.getElementById('currentPassword').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        if (newPassword !== confirmPassword) {
+          showToast('New passwords do not match', 'error');
+          return;
+        }
+        const btn = document.getElementById('save-btn');
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Updating…';
+          await apiFetch('/profile/me/password', {
+            method: 'PUT',
+            body: JSON.stringify({ currentPassword, newPassword })
+          });
+          e.target.reset();
+          showToast('Password updated successfully', 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Update Password';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

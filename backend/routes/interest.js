@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const DB = require('../db/jsonDb');
+const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
 

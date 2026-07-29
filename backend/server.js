@@ -2,9 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const DB = require('./db/jsonDb');
 
+// Must run before requiring ./db — the storage backend is chosen from
+// process.env.MONGO_URI at require time.
 dotenv.config();
+
+const DB = require('./db');
 
 const app = express();
 

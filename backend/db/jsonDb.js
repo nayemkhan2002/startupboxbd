@@ -2,7 +2,10 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcrypt');
 
-const DATA_DIR = path.join(__dirname, '../data');
+// Data lives outside the deploy tree in production so releases never overwrite it.
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : path.join(__dirname, '../data');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -63,13 +66,17 @@ const initDb = async () => {
   const users = readCollection('users');
   let updated = false;
 
-  const adminExists = users.find(u => u.email === 'admin@startupboxbd.com');
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@startupboxbd.com';
+  const adminExists = users.find(u => u.email === adminEmail);
   if (!adminExists) {
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
+      throw new Error('ADMIN_PASSWORD must be set in production to seed the admin account');
+    }
+    const hashedPassword = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'password123', 10);
     users.push({
       _id: 'admin_id_default',
       name: 'Admin',
-      email: 'admin@startupboxbd.com',
+      email: adminEmail,
       password: hashedPassword,
       role: 'admin',
       phone: '',
@@ -91,8 +98,9 @@ const initDb = async () => {
     console.log('Seeded Admin user (admin@startupboxbd.com / password123)');
   }
 
+  // Demo investor is a local-development convenience only.
   const investorExists = users.find(u => u.email === 'investor@startupboxbd.com');
-  if (!investorExists) {
+  if (!investorExists && process.env.NODE_ENV !== 'production') {
     const hashedPassword = await bcrypt.hash('password123', 10);
     users.push({
       _id: 'investor_id_default',

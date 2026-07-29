@@ -22,3 +22,6 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# Runtime data (lives outside deploy tree in production)
+backend/data/*.json

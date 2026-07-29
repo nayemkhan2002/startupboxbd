@@ -1,0 +1,93 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Never let two deploys race onto the same server.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  APP_ROOT: /home/startupboxbd/startupboxbd-app
+  NODE_VERSION: '20.18.3'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Verify lockfile installs cleanly
+        run: npm ci
+
+      - name: Build release tarball
+        run: |
+          tar -czf release.tar.gz \
+            backend/ frontend/ package.json package-lock.json
+          ls -lh release.tar.gz
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload release
+        run: |
+          scp -P ${{ secrets.SSH_PORT }} release.tar.gz \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/release.tar.gz
+
+      - name: Extract, install deps, restart
+        run: |
+          ssh -p ${{ secrets.SSH_PORT }} \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} bash -s <<'REMOTE'
+          set -euo pipefail
+          APP_ROOT=/home/startupboxbd/startupboxbd-app
+
+          # Keep a rollback copy of the previous release's code.
+          rm -rf ~/previous_release
+          mkdir -p ~/previous_release
+          for d in backend frontend package.json package-lock.json; do
+            [ -e "$APP_ROOT/$d" ] && cp -a "$APP_ROOT/$d" ~/previous_release/ || true
+          done
+
+          # node_modules is deliberately NOT in the tarball, so it survives.
+          tar -xzf ~/release.tar.gz -C "$APP_ROOT"
+          rm -f ~/release.tar.gz
+
+          # Install production deps with the CloudLinux-managed npm.
+          cloudlinux-selector install-modules --json --interpreter=nodejs \
+            --app-root="$APP_ROOT"
+
+          cloudlinux-selector restart --json --interpreter=nodejs \
+            --app-root="$APP_ROOT"
+          REMOTE
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              --max-time 15 https://startupboxbd.com/ || echo 000)
+            echo "attempt $i -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Deploy healthy."
+              exit 0
+            fi
+            sleep 6
+          done
+          echo "Health check failed after 10 attempts."
+          exit 1

@@ -13,6 +13,7 @@ concurrency:
 env:
   APP_ROOT: /home/startupboxbd/startupboxbd-app
   NODE_VERSION: '20.18.3'
+  SITE_URL: https://startupboxbd.com
 
 jobs:
   deploy:
@@ -23,6 +24,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Shared pretty-printing helpers, sourced by every later step.
+      - name: Bootstrap log helpers
+        run: |
+          cat > /tmp/log.sh <<'HELPERS'
+          C_RESET=$'\033[0m';  C_DIM=$'\033[2m';   C_BOLD=$'\033[1m'
+          C_CYAN=$'\033[36m';  C_GREEN=$'\033[32m'
+          C_YELL=$'\033[33m';  C_RED=$'\033[31m';  C_MAG=$'\033[35m'
+
+          # Pad by character count, not bytes — titles contain multi-byte
+          # glyphs (·, ✔) and %-60s would misalign the right border.
+          banner() {
+            local title="$1" width=60 pad
+            pad=$(( width - ${#title} )); [ "$pad" -lt 0 ] && pad=0
+            printf '\n%s╔══════════════════════════════════════════════════════════════╗%s\n' "$C_CYAN" "$C_RESET"
+            printf '%s║%s %s%s%s%*s %s║%s\n' \
+              "$C_CYAN" "$C_RESET" "$C_BOLD" "$title" "$C_RESET" "$pad" "" "$C_CYAN" "$C_RESET"
+            printf '%s╚══════════════════════════════════════════════════════════════╝%s\n' "$C_CYAN" "$C_RESET"
+          }
+          step()  { printf '%s  ▸%s %s\n' "$C_MAG"   "$C_RESET" "$1"; }
+          ok()    { printf '%s  ✔%s %s\n' "$C_GREEN" "$C_RESET" "$1"; }
+          warn()  { printf '%s  ▲%s %s\n' "$C_YELL"  "$C_RESET" "$1"; }
+          fail()  { printf '%s  ✖%s %s\n' "$C_RED"   "$C_RESET" "$1"; }
+          kv()    { printf '    %s%-16s%s %s\n' "$C_DIM" "$1" "$C_RESET" "$2"; }
+          rule()  { printf '%s  ────────────────────────────────────────────────────────────%s\n' "$C_DIM" "$C_RESET"; }
+          HELPERS
+          echo "DEPLOY_START=$(date +%s)" >> "$GITHUB_ENV"
+          echo "Log helpers ready."
+
+      - name: Deployment plan
+        run: |
+          source /tmp/log.sh
+          banner "STARTUPBOXBD · PRODUCTION DEPLOY"
+          kv "Commit"    "$(git rev-parse --short HEAD)"
+          kv "Branch"    "${GITHUB_REF_NAME}"
+          kv "Author"    "$(git log -1 --pretty=%an)"
+          kv "Message"   "$(git log -1 --pretty=%s | cut -c1-46)"
+          kv "Triggered" "${GITHUB_EVENT_NAME}"
+          kv "Run"       "#${GITHUB_RUN_NUMBER}  (attempt ${GITHUB_RUN_ATTEMPT})"
+          rule
+          kv "Target"    "cPanel · LiteSpeed Passenger"
+          kv "Runtime"   "Node ${NODE_VERSION}"
+          kv "App root"  "${APP_ROOT}"
+          kv "Site"      "${SITE_URL}"
+          rule
+          step "Pipeline: build → upload → install → restart → verify"
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -30,66 +77,159 @@ jobs:
           cache: npm
 
       - name: Verify lockfile installs cleanly
-        run: npm ci
+        run: |
+          source /tmp/log.sh
+          banner "1/5 · DEPENDENCY CHECK"
+          step "Running npm ci against package-lock.json"
+          echo "::group::npm ci output"
+          npm ci
+          echo "::endgroup::"
+          ok "Lockfile is valid and installable"
+          kv "Packages" "$(ls node_modules | wc -l) installed"
 
       - name: Build release tarball
         run: |
-          tar -czf release.tar.gz \
-            backend/ frontend/ package.json package-lock.json
-          ls -lh release.tar.gz
+          source /tmp/log.sh
+          banner "2/5 · BUILD RELEASE ARTIFACT"
+          step "Packing backend/, frontend/, package manifests"
+          warn "node_modules excluded — installed server-side by the selector"
+          tar -czf release.tar.gz backend/ frontend/ package.json package-lock.json
+          SIZE=$(du -h release.tar.gz | cut -f1)
+          COUNT=$(tar -tzf release.tar.gz | grep -vc '/$' || true)
+          echo "::group::Archive contents (top level)"
+          tar -tzf release.tar.gz | awk -F/ '{print $1"/"$2}' | sort -u | head -30
+          echo "::endgroup::"
+          ok "Artifact built"
+          kv "Size"  "$SIZE"
+          kv "Files" "$COUNT"
+          echo "ARTIFACT_SIZE=$SIZE"   >> "$GITHUB_ENV"
+          echo "ARTIFACT_FILES=$COUNT" >> "$GITHUB_ENV"
 
       - name: Configure SSH
         run: |
+          source /tmp/log.sh
+          banner "3/5 · SECURE CHANNEL"
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+          step "Deploy key installed (ed25519)"
+          step "Host key pinned from SSH_KNOWN_HOSTS — no blind TOFU"
+          ok "SSH channel ready"
 
       - name: Upload release
         run: |
+          source /tmp/log.sh
+          banner "4/5 · UPLOAD TO SERVER"
+          step "Transferring ${ARTIFACT_SIZE} to cPanel host"
           # -O forces the legacy scp protocol: the cPanel jailed shell
           # has no SFTP subsystem, so the default mode fails.
           scp -O -P ${{ secrets.SSH_PORT }} release.tar.gz \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/release.tar.gz
+          ok "Artifact delivered to ~/release.tar.gz"
 
       - name: Extract, install deps, restart
         run: |
+          source /tmp/log.sh
+          banner "5/5 · RELEASE ON SERVER"
           ssh -p ${{ secrets.SSH_PORT }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} bash -s <<'REMOTE'
           set -euo pipefail
           APP_ROOT=/home/startupboxbd/startupboxbd-app
 
-          # Keep a rollback copy of the previous release's code.
+          G=$'\033[32m'; M=$'\033[35m'; D=$'\033[2m'; R=$'\033[0m'
+          rstep() { printf '%s  ▸%s %s\n' "$M" "$R" "$1"; }
+          rok()   { printf '%s  ✔%s %s\n' "$G" "$R" "$1"; }
+          rkv()   { printf '    %s%-16s%s %s\n' "$D" "$1" "$R" "$2"; }
+
+          rstep "Snapshotting current release for rollback"
           rm -rf ~/previous_release
           mkdir -p ~/previous_release
           for d in backend frontend package.json package-lock.json; do
             [ -e "$APP_ROOT/$d" ] && cp -a "$APP_ROOT/$d" ~/previous_release/ || true
           done
+          rok "Rollback copy at ~/previous_release"
 
+          rstep "Extracting new release"
           # node_modules is deliberately NOT in the tarball, so it survives.
           tar -xzf ~/release.tar.gz -C "$APP_ROOT"
           rm -f ~/release.tar.gz
+          rok "Files in place"
+          rkv "Release" "$(find "$APP_ROOT/backend" "$APP_ROOT/frontend" -type f | wc -l) files"
 
-          # Install production deps with the CloudLinux-managed npm.
+          rstep "Installing production dependencies"
           cloudlinux-selector install-modules --json --interpreter=nodejs \
             --app-root="$APP_ROOT"
+          rok "Modules installed ($(ls "$APP_ROOT/node_modules" | wc -l) packages)"
 
+          rstep "Restarting Passenger application"
           cloudlinux-selector restart --json --interpreter=nodejs \
             --app-root="$APP_ROOT"
+          rok "Application restarted"
           REMOTE
+          ok "Server-side release complete"
 
       - name: Health check
         run: |
+          source /tmp/log.sh
+          banner "VERIFY · POST-DEPLOY HEALTH"
+          step "Polling ${SITE_URL} until it answers 200"
+          rule
           for i in $(seq 1 10); do
             code=$(curl -sS -o /dev/null -w '%{http_code}' \
-              --max-time 15 https://startupboxbd.com/ || echo 000)
-            echo "attempt $i -> HTTP $code"
+              --max-time 15 "${SITE_URL}/" || echo 000)
             if [ "$code" = "200" ]; then
-              echo "Deploy healthy."
+              printf '    attempt %-2s  %s200 OK%s\n' "$i" "$C_GREEN" "$C_RESET"
+              rule
+              ok "Site is live and healthy"
+              echo "HEALTH_ATTEMPTS=$i" >> "$GITHUB_ENV"
+              echo "::notice title=Deploy healthy::${SITE_URL} returned 200 on attempt $i"
               exit 0
             fi
+            printf '    attempt %-2s  %swaiting… (HTTP %s)%s\n' "$i" "$C_DIM" "$code" "$C_RESET"
             sleep 6
           done
-          echo "Health check failed after 10 attempts."
+          rule
+          fail "No 200 response after 10 attempts"
+          echo "::error title=Health check failed::${SITE_URL} never returned 200 — the app may have failed to boot. Check ~/startupboxbd-app/stderr.log"
           exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          source /tmp/log.sh
+          ELAPSED=$(( $(date +%s) - DEPLOY_START ))
+          MINS=$(( ELAPSED / 60 )); SECS=$(( ELAPSED % 60 ))
+
+          if [ "${{ job.status }}" = "success" ]; then
+            ICON="✅"; VERDICT="DEPLOY SUCCEEDED"
+            banner "✔ DEPLOY SUCCEEDED IN ${MINS}m ${SECS}s"
+            ok "${SITE_URL} is serving the new release"
+          else
+            ICON="❌"; VERDICT="DEPLOY FAILED"
+            banner "✖ DEPLOY FAILED AFTER ${MINS}m ${SECS}s"
+            fail "Previous release is still on the server at ~/previous_release"
+          fi
+
+          {
+            echo "## ${ICON} ${VERDICT}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| **Site** | ${SITE_URL} |"
+            echo "| **Commit** | \`$(git rev-parse --short HEAD)\` — $(git log -1 --pretty=%s | cut -c1-60) |"
+            echo "| **Author** | $(git log -1 --pretty=%an) |"
+            echo "| **Branch** | \`${GITHUB_REF_NAME}\` |"
+            echo "| **Artifact** | ${ARTIFACT_SIZE:-n/a} · ${ARTIFACT_FILES:-?} files |"
+            echo "| **Runtime** | Node ${NODE_VERSION} · LiteSpeed Passenger |"
+            echo "| **Duration** | ${MINS}m ${SECS}s |"
+            if [ -n "${HEALTH_ATTEMPTS:-}" ]; then
+              echo "| **Health** | 200 OK on attempt ${HEALTH_ATTEMPTS} |"
+            fi
+            echo ""
+            if [ "${{ job.status }}" != "success" ]; then
+              echo "> **Rollback:** the previous release is preserved at \`~/previous_release\` on the server."
+              echo "> Check \`~/startupboxbd-app/stderr.log\` for boot errors."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -48,7 +48,9 @@ jobs:
 
       - name: Upload release
         run: |
-          scp -P ${{ secrets.SSH_PORT }} release.tar.gz \
+          # -O forces the legacy scp protocol: the cPanel jailed shell
+          # has no SFTP subsystem, so the default mode fails.
+          scp -O -P ${{ secrets.SSH_PORT }} release.tar.gz \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/release.tar.gz
 
       - name: Extract, install deps, restart

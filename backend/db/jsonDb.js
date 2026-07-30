@@ -96,6 +96,15 @@ const initDb = async () => {
     });
     updated = true;
     console.log('Seeded Admin user (admin@startupboxbd.com / password123)');
+  } else {
+    // Verify existing admin password is correct; reset if it doesn't match.
+    const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
+    const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
+    if (!passwordOk) {
+      adminExists.password = await bcrypt.hash(adminPassword, 10);
+      updated = true;
+      console.log('Admin password was out of sync — reset to match ADMIN_PASSWORD / default.');
+    }
   }
 
   // Demo investor is a local-development convenience only.

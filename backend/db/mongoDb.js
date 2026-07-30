@@ -65,6 +65,16 @@ const initDb = async () => {
       createdAt: new Date().toISOString()
     });
     console.log(`Seeded Admin user (${adminEmail})`);
+  } else {
+    // Verify existing admin password is correct; reset if it doesn't match.
+    const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
+    if (!passwordOk) {
+      await User.updateOne(
+        { email: adminEmail },
+        { $set: { password: await bcrypt.hash(adminPassword, 10) } }
+      );
+      console.log(`Admin password was out of sync — reset to match ADMIN_PASSWORD / default.`);
+    }
   }
 
   // Demo investor is a local-development convenience only.

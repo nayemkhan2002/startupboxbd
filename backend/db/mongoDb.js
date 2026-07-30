@@ -46,16 +46,17 @@ const initDb = async () => {
   await connect();
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@startupboxbd.com';
+  const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
   const adminExists = await User.findOne({ email: adminEmail }).lean();
   if (!adminExists) {
     if (process.env.NODE_ENV === 'production' && !process.env.ADMIN_PASSWORD) {
-      throw new Error('ADMIN_PASSWORD must be set in production to seed the admin account');
+      console.warn('⚠️  ADMIN_PASSWORD not set — seeding admin with default password. Set ADMIN_PASSWORD in production!');
     }
     await User.create({
       _id: 'admin_id_default',
       name: 'Admin',
       email: adminEmail,
-      password: await bcrypt.hash(process.env.ADMIN_PASSWORD || 'password123', 10),
+      password: await bcrypt.hash(adminPassword, 10),
       role: 'admin',
       phone: '',
       address: '',

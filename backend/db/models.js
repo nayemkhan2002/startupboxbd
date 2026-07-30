@@ -30,6 +30,8 @@ const userSchema = new mongoose.Schema({
     branch: String,
     routingNumber: String
   },
+  resetPasswordToken: { type: String, index: true },
+  resetPasswordExpires: Number,
   createdAt: String
 }, opts);
 

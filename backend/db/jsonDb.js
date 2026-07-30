@@ -157,7 +157,12 @@ const DB = {
     },
     findOne: async (query = {}) => {
       const data = readCollection('users');
-      return data.find(u => u.email === query.email) || null;
+      return data.find(u => {
+        for (const [k, v] of Object.entries(query)) {
+          if (u[k] !== v) return false;
+        }
+        return true;
+      }) || null;
     },
     findById: async (id) => {
       const data = readCollection('users');
@@ -223,6 +228,16 @@ const DB = {
       const match = await bcrypt.compare(currentPassword, users[index].password);
       if (!match) return { ok: false, message: 'Current password is incorrect' };
       users[index].password = await bcrypt.hash(newPassword, 10);
+      writeCollection('users', users);
+      return { ok: true };
+    },
+    resetPassword: async (id, newPassword) => {
+      const users = readCollection('users');
+      const index = users.findIndex(u => u._id === id);
+      if (index === -1) return { ok: false, message: 'User not found' };
+      users[index].password = await bcrypt.hash(newPassword, 10);
+      delete users[index].resetPasswordToken;
+      delete users[index].resetPasswordExpires;
       writeCollection('users', users);
       return { ok: true };
     },

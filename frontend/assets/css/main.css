@@ -159,6 +159,19 @@ h1, h2, h3, h4, h5 {
   color: var(--gold);
 }
 
+.btn-closed {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  cursor: default;
+  pointer-events: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+  opacity: 0.9;
+}
+
 .btn-ghost {
   background: transparent;
   color: inherit;
@@ -197,6 +210,39 @@ h1, h2, h3, h4, h5 {
   box-shadow: var(--shadow-md);
 }
 
+/* ---------- Announcement Ticker ---------- */
+.announcement-bar {
+  background: linear-gradient(90deg, #166534, #15803d, #166534);
+  color: #fff;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: var(--font-bn), var(--font-en), sans-serif;
+  padding: 6px 0;
+  position: relative;
+}
+
+.announcement-track {
+  display: inline-flex;
+  gap: 60px;
+  animation: ticker-scroll 30s linear infinite;
+}
+
+.announcement-item {
+  flex-shrink: 0;
+  padding: 0 10px;
+}
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.announcement-bar:hover .announcement-track {
+  animation-play-state: paused;
+}
+
 /* ---------- Site header (public) ---------- */
 .site-header {
   position: sticky;
@@ -208,6 +254,257 @@ h1, h2, h3, h4, h5 {
   backdrop-filter: blur(16px);
   background: rgba(10, 15, 44, 0.82);
   border-bottom: 1px solid var(--glass-border);
+}
+
+/* ---------- Center Navigation ---------- */
+.site-nav-center {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.site-nav-center a {
+  color: rgba(255, 255, 255, 0.72);
+  font-weight: 500;
+  font-size: 0.88rem;
+  padding: 6px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.site-nav-center a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ---------- Social Icons ---------- */
+.social-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.social-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ---------- Header Left ---------- */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Hamburger Button ---------- */
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.hamburger-btn span {
+  display: block;
+  width: 100%;
+  height: 2px;
+  background: #fff;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- Mobile Sidebar ---------- */
+.mobile-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 998;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.mobile-sidebar-overlay.open {
+  display: block;
+  opacity: 1;
+}
+
+.mobile-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  max-width: 85vw;
+  background: var(--navy);
+  z-index: 999;
+  transform: translateX(-100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-sidebar.open {
+  transform: translateX(0);
+}
+
+.mobile-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-sidebar-header .brand-logo-img {
+  height: 40px;
+  max-width: 48px;
+  padding: 2px;
+}
+
+.mobile-sidebar-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mobile-sidebar-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.mobile-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 12px;
+}
+
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-item:hover {
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--gold);
+}
+
+.mobile-nav-icon {
+  font-size: 1rem;
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.mobile-sidebar-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 20px;
+}
+
+.mobile-sidebar-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 10px;
+}
+
+.mobile-sidebar-social {
+  padding: 14px 20px;
+}
+
+.mobile-social-row {
+  display: flex;
+  gap: 10px;
+}
+
+.mobile-social-row .social-link {
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.mobile-social-row .social-link:hover {
+  background: rgba(245, 166, 35, 0.2);
+  color: var(--gold);
+}
+
+.mobile-sidebar-contact {
+  padding: 14px 20px;
+}
+
+.mobile-contact-item {
+  display: block;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.9rem;
+  text-decoration: none;
+  padding: 6px 0;
+  transition: color 0.2s ease;
+}
+
+.mobile-contact-item:hover {
+  color: #fff;
+}
+
+.mobile-sidebar-actions {
+  padding: 16px 20px;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .site-header .container,
@@ -932,6 +1229,22 @@ nav a {
   font-size: 0.92rem;
 }
 
+.forgot-password-link {
+  text-align: right;
+  margin-top: 12px;
+  font-size: 0.85rem;
+}
+
+.forgot-password-link a {
+  color: rgba(255, 255, 255, 0.5);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.forgot-password-link a:hover {
+  color: var(--gold);
+}
+
 /* ---------- App shell (investor) ---------- */
 .app-shell {
   display: flex;
@@ -1444,6 +1757,11 @@ nav a {
 
 @media (max-width: 768px) {
   :root { --header-h: 64px; }
+  .site-nav-center { display: none; }
+  .social-icons { display: none; }
+  .hamburger-btn { display: flex; }
+  .site-nav #nav-login { font-size: 0.78rem; padding: 6px 8px; }
+  .site-nav #nav-register { font-size: 0.78rem; padding: 6px 10px; }
 
   .stats-grid,
   .feature-grid,

@@ -249,7 +249,9 @@ const projectCardHtml = (p, { href, cta = 'View Opportunity' } = {}) => {
           ${p.duration ? `<span class="meta-chip">${escapeHtml(p.duration)}</span>` : ''}
           <span class="risk-pill ${riskClass(p.riskLevel)}"><span class="risk-dot"></span>${escapeHtml(p.riskLevel || 'Medium')}</span>
         </div>
-        <a href="${href}" class="btn btn-outline btn-block">${cta}</a>
+        ${p.status === 'closed'
+          ? `<span class="btn btn-closed btn-block">🔒 Closed</span>`
+          : `<a href="${href}" class="btn btn-outline btn-block">${cta}</a>`}
       </div>
     </article>`;
 };

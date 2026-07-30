@@ -109,7 +109,7 @@ const DB = {
       if (query.role) q.role = query.role;
       return User.find(q).lean();
     },
-    findOne: async (query = {}) => User.findOne({ email: query.email }).lean(),
+    findOne: async (query = {}) => User.findOne(query).lean(),
     findById: async (id) => User.findById(id).lean(),
     create: async (userData) => {
       const doc = await User.create({
@@ -162,6 +162,16 @@ const DB = {
       await User.updateOne(
         { _id: id },
         { $set: { password: await bcrypt.hash(newPassword, 10) } }
+      );
+      return { ok: true };
+    },
+    resetPassword: async (id, newPassword) => {
+      await User.updateOne(
+        { _id: id },
+        {
+          $set: { password: await bcrypt.hash(newPassword, 10) },
+          $unset: { resetPasswordToken: 1, resetPasswordExpires: 1 }
+        }
       );
       return { ok: true };
     },

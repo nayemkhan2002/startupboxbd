@@ -5,7 +5,7 @@ const path = require('path');
 
 // Must run before requiring ./db — the storage backend is chosen from
 // process.env.MONGO_URI at require time.
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const DB = require('./db');
 

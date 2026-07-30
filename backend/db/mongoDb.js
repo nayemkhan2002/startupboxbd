@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const {
@@ -94,6 +96,23 @@ const initDb = async () => {
         createdAt: new Date().toISOString()
       });
       console.log('Seeded Investor user (investor@startupboxbd.com / password123)');
+    }
+  }
+
+  // Auto-seed projects if collection is empty
+  const projectCount = await Project.countDocuments();
+  if (projectCount === 0) {
+    const seedFile = path.join(__dirname, 'seed-projects.json');
+    if (fs.existsSync(seedFile)) {
+      try {
+        const seedData = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+        if (Array.isArray(seedData) && seedData.length > 0) {
+          await Project.insertMany(seedData);
+          console.log(`Seeded ${seedData.length} projects into MongoDB`);
+        }
+      } catch (e) {
+        console.error('Failed to seed projects into MongoDB:', e);
+      }
     }
   }
 };

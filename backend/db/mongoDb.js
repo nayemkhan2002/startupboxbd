@@ -199,6 +199,20 @@ const DB = {
     listInvestors: async () => {
       const list = await User.find({ role: 'investor' }).lean();
       return list.map(stripPassword);
+    },
+    suspendUser: async (id) => {
+      const user = await User.findById(id).lean();
+      if (!user || user.role === 'admin') return null;
+      const current = user.accountStatus || 'active';
+      const newStatus = current === 'suspended' ? 'active' : 'suspended';
+      const updated = await User.findByIdAndUpdate(id, { $set: { accountStatus: newStatus } }, { new: true }).lean();
+      return stripPassword(updated);
+    },
+    deleteUser: async (id) => {
+      const user = await User.findById(id).lean();
+      if (!user || user.role === 'admin') return null;
+      await User.deleteOne({ _id: id });
+      return stripPassword(user);
     }
   },
 

@@ -36,6 +36,9 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
     const user = await DB.users.findOne({ email });
     if (user && (await DB.users.matchPassword(password, user.password))) {
+      if (user.accountStatus === 'suspended') {
+        return res.status(403).json({ message: 'Your account has been suspended. Please contact support.' });
+      }
       res.json({
         _id: user._id,
         name: user.name,
@@ -155,6 +158,32 @@ router.get('/investors', protect, adminOnly, async (req, res) => {
     // Strip password from each user
     const investors = allUsers.map(({ password, ...rest }) => rest);
     res.json(investors);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// --- Admin: suspend / activate an investor ---
+router.put('/investors/:id/suspend', protect, adminOnly, async (req, res) => {
+  try {
+    const updated = await DB.users.suspendUser(req.params.id);
+    if (!updated) {
+      return res.status(404).json({ message: 'Investor not found' });
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// --- Admin: delete an investor account ---
+router.delete('/investors/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const removed = await DB.users.deleteUser(req.params.id);
+    if (!removed) {
+      return res.status(404).json({ message: 'Investor not found' });
+    }
+    res.json({ message: 'Investor deleted successfully', investor: removed });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

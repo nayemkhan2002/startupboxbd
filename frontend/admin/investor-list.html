@@ -7,6 +7,67 @@
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: capitalize;
+    }
+    .badge-active {
+      background: rgba(46, 204, 113, 0.12);
+      color: #2ecc71;
+    }
+    .badge-suspended {
+      background: rgba(231, 76, 60, 0.12);
+      color: #e74c3c;
+    }
+    .action-btns {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .action-btns .btn {
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      border-radius: 8px;
+    }
+    .btn-warn {
+      background: linear-gradient(135deg, #f39c12, #e67e22);
+      color: #fff;
+      border: none;
+    }
+    .btn-warn:hover {
+      background: linear-gradient(135deg, #e67e22, #d35400);
+      transform: translateY(-1px);
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: #fff;
+      border: none;
+    }
+    .btn-danger:hover {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+      transform: translateY(-1px);
+    }
+    .btn-success-outline {
+      background: transparent;
+      color: #2ecc71;
+      border: 1px solid #2ecc71;
+    }
+    .btn-success-outline:hover {
+      background: rgba(46, 204, 113, 0.1);
+      transform: translateY(-1px);
+    }
+    .investor-row-suspended {
+      opacity: 0.65;
+    }
+  </style>
 </head>
 <body>
   <div class="admin-wrapper">
@@ -58,8 +119,16 @@
           <div class="kpi-value accent" id="kpi-total">—</div>
         </div>
         <div class="kpi-card">
+          <div class="kpi-label">Active</div>
+          <div class="kpi-value success" id="kpi-active">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Suspended</div>
+          <div class="kpi-value" id="kpi-suspended" style="color:#e74c3c;">—</div>
+        </div>
+        <div class="kpi-card">
           <div class="kpi-label">Joined This Month</div>
-          <div class="kpi-value success" id="kpi-this-month">—</div>
+          <div class="kpi-value" id="kpi-this-month">—</div>
         </div>
       </div>
 
@@ -77,11 +146,13 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Phone</th>
+                <th>Status</th>
                 <th>Joined</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="investors-table">
-              <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+              <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -103,35 +174,12 @@
 
       let investors = [];
 
-      const render = (list) => {
-        const tbody = document.getElementById('investors-table');
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
-          return;
-        }
-        tbody.innerHTML = list.map((inv, idx) => `
-          <tr>
-            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
-            <td>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#E8950F);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;">
-                  ${escapeHtml((inv.name || '?').charAt(0).toUpperCase())}
-                </div>
-                <strong>${escapeHtml(inv.name || '—')}</strong>
-              </div>
-            </td>
-            <td><a href="mailto:${escapeHtml(inv.email)}" style="color:var(--gold);">${escapeHtml(inv.email)}</a></td>
-            <td>${escapeHtml(inv.phone || '—')}</td>
-            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
-          </tr>
-        `).join('');
-      };
-
-      try {
-        investors = await apiFetch('/auth/investors');
-
-        // KPIs
+      const updateKpis = () => {
         document.getElementById('kpi-total').textContent = investors.length;
+        const active = investors.filter(inv => (inv.accountStatus || 'active') === 'active');
+        const suspended = investors.filter(inv => inv.accountStatus === 'suspended');
+        document.getElementById('kpi-active').textContent = active.length;
+        document.getElementById('kpi-suspended').textContent = suspended.length;
         const now = new Date();
         const thisMonth = investors.filter(inv => {
           if (!inv.createdAt) return false;
@@ -139,12 +187,63 @@
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         document.getElementById('kpi-this-month').textContent = thisMonth.length;
+      };
 
-        render(investors);
-      } catch (err) {
-        console.error(err);
-        showToast(err.message, 'error');
-      }
+      const render = (list) => {
+        const tbody = document.getElementById('investors-table');
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = list.map((inv, idx) => {
+          const status = inv.accountStatus || 'active';
+          const isSuspended = status === 'suspended';
+          return `
+          <tr class="${isSuspended ? 'investor-row-suspended' : ''}">
+            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,${isSuspended ? '#94a3b8,#64748b' : 'var(--gold),#E8950F'});color:${isSuspended ? '#fff' : 'var(--navy)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;">
+                  ${escapeHtml((inv.name || '?').charAt(0).toUpperCase())}
+                </div>
+                <strong>${escapeHtml(inv.name || '—')}</strong>
+              </div>
+            </td>
+            <td><a href="mailto:${escapeHtml(inv.email)}" style="color:var(--gold);">${escapeHtml(inv.email)}</a></td>
+            <td>${escapeHtml(inv.phone || '—')}</td>
+            <td>
+              <span class="badge-status ${isSuspended ? 'badge-suspended' : 'badge-active'}">
+                <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span>
+                ${isSuspended ? 'Suspended' : 'Active'}
+              </span>
+            </td>
+            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+            <td>
+              <div class="action-btns">
+                <button class="btn ${isSuspended ? 'btn-success-outline' : 'btn-warn'} btn-sm btn-suspend" data-id="${escapeHtml(inv._id)}" title="${isSuspended ? 'Activate this investor' : 'Suspend this investor'}">
+                  ${isSuspended ? '✓ Activate' : '⏸ Suspend'}
+                </button>
+                <button class="btn btn-danger btn-sm btn-delete" data-id="${escapeHtml(inv._id)}" data-name="${escapeHtml(inv.name || inv.email)}" title="Delete this investor permanently">
+                  🗑 Delete
+                </button>
+              </div>
+            </td>
+          </tr>`;
+        }).join('');
+      };
+
+      const loadInvestors = async () => {
+        try {
+          investors = await apiFetch('/auth/investors');
+          updateKpis();
+          render(investors);
+        } catch (err) {
+          console.error(err);
+          showToast(err.message, 'error');
+        }
+      };
+
+      await loadInvestors();
 
       // Search filter
       document.getElementById('search-input').addEventListener('input', (e) => {
@@ -158,6 +257,70 @@
           (inv.email || '').toLowerCase().includes(q)
         );
         render(filtered);
+      });
+
+      // Delegate suspend + delete clicks
+      document.getElementById('investors-table').addEventListener('click', async (e) => {
+        const suspendBtn = e.target.closest('.btn-suspend');
+        const deleteBtn = e.target.closest('.btn-delete');
+
+        if (suspendBtn) {
+          const id = suspendBtn.getAttribute('data-id');
+          const inv = investors.find(i => i._id === id);
+          const isSuspended = inv && inv.accountStatus === 'suspended';
+          const action = isSuspended ? 'activate' : 'suspend';
+
+          const confirmed = await confirmDialog(
+            `Are you sure you want to ${action} this investor?`,
+            { title: `${action.charAt(0).toUpperCase() + action.slice(1)} Investor`, confirmText: action.charAt(0).toUpperCase() + action.slice(1), danger: !isSuspended }
+          );
+          if (!confirmed) return;
+
+          try {
+            await apiFetch(`/auth/investors/${id}/suspend`, { method: 'PUT' });
+            showToast(`Investor ${action}d successfully`, 'success');
+            await loadInvestors();
+            // Re-apply search filter if active
+            const q = document.getElementById('search-input').value.toLowerCase().trim();
+            if (q) {
+              const filtered = investors.filter(inv =>
+                (inv.name || '').toLowerCase().includes(q) ||
+                (inv.email || '').toLowerCase().includes(q)
+              );
+              render(filtered);
+            }
+          } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+          }
+        }
+
+        if (deleteBtn) {
+          const id = deleteBtn.getAttribute('data-id');
+          const name = deleteBtn.getAttribute('data-name');
+
+          const confirmed = await confirmDialog(
+            `Are you sure you want to permanently delete investor "${name}"? This action cannot be undone.`,
+            { title: 'Delete Investor', confirmText: 'Delete', danger: true }
+          );
+          if (!confirmed) return;
+
+          try {
+            await apiFetch(`/auth/investors/${id}`, { method: 'DELETE' });
+            showToast('Investor deleted successfully', 'success');
+            await loadInvestors();
+            // Re-apply search filter if active
+            const q = document.getElementById('search-input').value.toLowerCase().trim();
+            if (q) {
+              const filtered = investors.filter(inv =>
+                (inv.name || '').toLowerCase().includes(q) ||
+                (inv.email || '').toLowerCase().includes(q)
+              );
+              render(filtered);
+            }
+          } catch (err) {
+            showToast('Failed: ' + err.message, 'error');
+          }
+        }
       });
     });
   </script>

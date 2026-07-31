@@ -248,6 +248,25 @@ const DB = {
       return readCollection('users')
         .filter(u => u.role === 'investor')
         .map(stripPassword);
+    },
+    suspendUser: async (id) => {
+      const users = readCollection('users');
+      const index = users.findIndex(u => u._id === id);
+      if (index === -1) return null;
+      if (users[index].role === 'admin') return null;
+      const current = users[index].accountStatus || 'active';
+      users[index].accountStatus = current === 'suspended' ? 'active' : 'suspended';
+      writeCollection('users', users);
+      return stripPassword(users[index]);
+    },
+    deleteUser: async (id) => {
+      const users = readCollection('users');
+      const index = users.findIndex(u => u._id === id);
+      if (index === -1) return null;
+      if (users[index].role === 'admin') return null;
+      const removed = users.splice(index, 1)[0];
+      writeCollection('users', users);
+      return stripPassword(removed);
     }
   },
   projects: {

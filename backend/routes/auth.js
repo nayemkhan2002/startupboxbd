@@ -145,4 +145,19 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+// --- Admin: list all investor accounts ---
+const { protect } = require('../middleware/auth');
+const { adminOnly } = require('../middleware/adminOnly');
+
+router.get('/investors', protect, adminOnly, async (req, res) => {
+  try {
+    const allUsers = await DB.users.find({ role: 'investor' });
+    // Strip password from each user
+    const investors = allUsers.map(({ password, ...rest }) => rest);
+    res.json(investors);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

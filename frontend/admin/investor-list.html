@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investors — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Registered Investors</h2>
+            <p>All investor accounts on the platform.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-grid" id="investor-kpis">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Investors</div>
+          <div class="kpi-value accent" id="kpi-total">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Joined This Month</div>
+          <div class="kpi-value success" id="kpi-this-month">—</div>
+        </div>
+      </div>
+
+      <!-- Search -->
+      <div class="panel" style="margin-bottom:0;padding:16px 20px;">
+        <input type="text" id="search-input" class="form-control" placeholder="Search by name or email…" style="max-width:380px;">
+      </div>
+
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Joined</th>
+              </tr>
+            </thead>
+            <tbody id="investors-table">
+              <tr><td colspan="5"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      let investors = [];
+
+      const render = (list) => {
+        const tbody = document.getElementById('investors-table');
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = list.map((inv, idx) => `
+          <tr>
+            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#E8950F);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;">
+                  ${escapeHtml((inv.name || '?').charAt(0).toUpperCase())}
+                </div>
+                <strong>${escapeHtml(inv.name || '—')}</strong>
+              </div>
+            </td>
+            <td><a href="mailto:${escapeHtml(inv.email)}" style="color:var(--gold);">${escapeHtml(inv.email)}</a></td>
+            <td>${escapeHtml(inv.phone || '—')}</td>
+            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+          </tr>
+        `).join('');
+      };
+
+      try {
+        investors = await apiFetch('/auth/investors');
+
+        // KPIs
+        document.getElementById('kpi-total').textContent = investors.length;
+        const now = new Date();
+        const thisMonth = investors.filter(inv => {
+          if (!inv.createdAt) return false;
+          const d = new Date(inv.createdAt);
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        });
+        document.getElementById('kpi-this-month').textContent = thisMonth.length;
+
+        render(investors);
+      } catch (err) {
+        console.error(err);
+        showToast(err.message, 'error');
+      }
+
+      // Search filter
+      document.getElementById('search-input').addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        if (!q) {
+          render(investors);
+          return;
+        }
+        const filtered = investors.filter(inv =>
+          (inv.name || '').toLowerCase().includes(q) ||
+          (inv.email || '').toLowerCase().includes(q)
+        );
+        render(filtered);
+      });
+    });
+  </script>
+</body>
+</html>

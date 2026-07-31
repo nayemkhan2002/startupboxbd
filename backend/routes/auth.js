@@ -189,4 +189,58 @@ router.delete('/investors/:id', protect, adminOnly, async (req, res) => {
   }
 });
 
+// --- Admin Management Routes ---
+router.get('/admins', protect, adminOnly, async (req, res) => {
+  try {
+    const admins = await DB.users.find({ role: 'admin' });
+    const strippedAdmins = admins.map(({ password, ...rest }) => rest);
+    res.json(strippedAdmins);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/admins', protect, adminOnly, async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    const existing = await DB.users.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ message: 'User with this email already exists' });
+    }
+    const newAdmin = await DB.users.create({
+      name,
+      email: email.toLowerCase(),
+      password,
+      role: 'admin'
+    });
+    const { password: _, ...adminWithoutPassword } = newAdmin;
+    res.status(201).json(adminWithoutPassword);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete('/admins/:id', protect, adminOnly, async (req, res) => {
+  try {
+    if (req.params.id === req.user._id) {
+      return res.status(400).json({ message: 'You cannot delete your own admin account' });
+    }
+    if (DB.users.deleteAdmin) {
+      const removed = await DB.users.deleteAdmin(req.params.id, req.user._id);
+      if (!removed) return res.status(404).json({ message: 'Admin user not found' });
+      return res.json({ message: 'Admin deleted successfully', admin: removed });
+    } else {
+      const adminUser = await DB.users.findOne({ _id: req.params.id, role: 'admin' });
+      if (!adminUser) return res.status(404).json({ message: 'Admin user not found' });
+      const removed = await DB.users.deleteUser ? await DB.users.deleteUser(req.params.id) : null;
+      return res.json({ message: 'Admin deleted successfully' });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

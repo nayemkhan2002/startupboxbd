@@ -267,6 +267,15 @@ const DB = {
       const removed = users.splice(index, 1)[0];
       writeCollection('users', users);
       return stripPassword(removed);
+    },
+    deleteAdmin: async (id, requesterId) => {
+      if (id === requesterId) return null;
+      const users = readCollection('users');
+      const index = users.findIndex(u => u._id === id && u.role === 'admin');
+      if (index === -1) return null;
+      const removed = users.splice(index, 1)[0];
+      writeCollection('users', users);
+      return stripPassword(removed);
     }
   },
   projects: {

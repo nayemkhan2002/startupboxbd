@@ -213,6 +213,13 @@ const DB = {
       if (!user || user.role === 'admin') return null;
       await User.deleteOne({ _id: id });
       return stripPassword(user);
+    },
+    deleteAdmin: async (id, requesterId) => {
+      if (id === requesterId) return null;
+      const user = await User.findOne({ _id: id, role: 'admin' }).lean();
+      if (!user) return null;
+      await User.deleteOne({ _id: id });
+      return stripPassword(user);
     }
   },
 

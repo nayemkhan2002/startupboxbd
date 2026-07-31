@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Management — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .badge-self {
+      background: rgba(245, 166, 35, 0.15);
+      color: var(--gold);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .btn-danger-sm {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: #fff;
+      border: none;
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .btn-danger-sm:hover {
+      background: linear-gradient(135deg, #c0392b, #a93226);
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html" class="active"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Admin Management</h2>
+            <p>View and register administrators who can manage this platform.</p>
+          </div>
+        </div>
+        <div class="admin-top-actions">
+          <button type="button" class="btn btn-sm" id="open-add-modal-btn">+ Add New Admin</button>
+        </div>
+      </div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Administrators</div>
+          <div class="kpi-value accent" id="kpi-total-admins">—</div>
+        </div>
+      </div>
+
+      <div class="panel mt-3">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Admin Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Joined</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="admins-table">
+              <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add Admin Modal -->
+  <div class="modal" id="add-admin-modal">
+    <div class="modal-content">
+      <div class="flex justify-between items-center" style="margin-bottom:20px;">
+        <h3>Add New Administrator</h3>
+        <button type="button" class="btn btn-outline btn-sm" id="close-add-modal-btn">✕</button>
+      </div>
+      <form id="add-admin-form">
+        <div class="form-group" style="margin-bottom:16px;">
+          <label for="admin-full-name">Full Name *</label>
+          <input type="text" id="admin-full-name" class="form-control" placeholder="e.g. John Doe" required>
+        </div>
+        <div class="form-group" style="margin-bottom:16px;">
+          <label for="admin-email-input">Email Address *</label>
+          <input type="email" id="admin-email-input" class="form-control" placeholder="e.g. admin2@startupboxbd.com" required>
+        </div>
+        <div class="form-group" style="margin-bottom:24px;">
+          <label for="admin-password-input">Password *</label>
+          <input type="password" id="admin-password-input" class="form-control" placeholder="••••••••" required minlength="6">
+        </div>
+        <div class="flex gap-2 justify-end">
+          <button type="button" class="btn btn-outline" id="cancel-add-modal-btn">Cancel</button>
+          <button type="submit" class="btn" id="submit-admin-btn">Create Admin Account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const currentUser = checkAuth('admin');
+      if (!currentUser) return;
+
+      document.getElementById('admin-name').textContent = currentUser.name || 'Admin';
+      document.getElementById('admin-email').textContent = currentUser.email || '';
+      document.getElementById('admin-avatar').textContent = (currentUser.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      const modal = document.getElementById('add-admin-modal');
+      const openModalBtn = document.getElementById('open-add-modal-btn');
+      const closeModalBtn = document.getElementById('close-add-modal-btn');
+      const cancelModalBtn = document.getElementById('cancel-add-modal-btn');
+      const addAdminForm = document.getElementById('add-admin-form');
+
+      const openModal = () => modal.classList.add('open');
+      const closeModal = () => {
+        modal.classList.remove('open');
+        addAdminForm.reset();
+      };
+
+      openModalBtn.addEventListener('click', openModal);
+      closeModalBtn.addEventListener('click', closeModal);
+      cancelModalBtn.addEventListener('click', closeModal);
+
+      let adminsList = [];
+
+      const renderAdmins = (admins) => {
+        const tbody = document.getElementById('admins-table');
+        document.getElementById('kpi-total-admins').textContent = admins.length;
+
+        if (!admins.length) {
+          tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No administrators found</h3></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = admins.map((admin, idx) => {
+          const isSelf = admin._id === currentUser._id;
+          return `
+            <tr>
+              <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+              <td>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#E8950F);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;">
+                    ${escapeHtml((admin.name || '?').charAt(0).toUpperCase())}
+                  </div>
+                  <strong>${escapeHtml(admin.name || 'Admin')}</strong>
+                </div>
+              </td>
+              <td><a href="mailto:${escapeHtml(admin.email)}" style="color:var(--gold);">${escapeHtml(admin.email)}</a></td>
+              <td><span class="badge" style="background:rgba(59,130,246,0.12);color:#3b82f6;">Administrator</span></td>
+              <td>${admin.createdAt ? new Date(admin.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+              <td>
+                ${isSelf
+                  ? `<span class="badge-self">You (Current)</span>`
+                  : `<button class="btn-danger-sm btn-delete-admin" data-id="${escapeHtml(admin._id)}" data-name="${escapeHtml(admin.name || admin.email)}">🗑 Remove</button>`
+                }
+              </td>
+            </tr>
+          `;
+        }).join('');
+      };
+
+      const loadAdmins = async () => {
+        try {
+          adminsList = await apiFetch('/auth/admins');
+          renderAdmins(adminsList);
+        } catch (err) {
+          console.error(err);
+          showToast(err.message, 'error');
+        }
+      };
+
+      await loadAdmins();
+
+      addAdminForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('admin-full-name').value.trim();
+        const email = document.getElementById('admin-email-input').value.trim();
+        const password = document.getElementById('admin-password-input').value;
+
+        if (!name || !email || !password) {
+          showToast('Please fill out all fields', 'error');
+          return;
+        }
+
+        try {
+          const submitBtn = document.getElementById('submit-admin-btn');
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Creating...';
+
+          await apiFetch('/auth/admins', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+          });
+
+          showToast(`Admin account created for ${name}`, 'success');
+          closeModal();
+          await loadAdmins();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          const submitBtn = document.getElementById('submit-admin-btn');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Admin Account';
+        }
+      });
+
+      document.getElementById('admins-table').addEventListener('click', async (e) => {
+        const delBtn = e.target.closest('.btn-delete-admin');
+        if (!delBtn) return;
+
+        const id = delBtn.getAttribute('data-id');
+        const name = delBtn.getAttribute('data-name');
+
+        const confirmed = await confirmDialog(
+          `Are you sure you want to remove administrator "${name}"? They will lose access to the admin portal.`,
+          { title: 'Remove Admin Account', confirmText: 'Remove Admin', danger: true }
+        );
+        if (!confirmed) return;
+
+        try {
+          await apiFetch(`/auth/admins/${id}`, { method: 'DELETE' });
+          showToast('Admin account removed', 'success');
+          await loadAdmins();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

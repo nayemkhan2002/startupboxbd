@@ -365,6 +365,7 @@ const DB = {
       return interests[index];
     },
     populateAll: async (interestsList) => {
+      if (!interestsList || !interestsList.length) return [];
       const users = readCollection('users');
       const projects = readCollection('projects');
       return interestsList.map(item => {

@@ -258,7 +258,10 @@ const DB = {
   },
 
   interests: {
-    find: async (query = {}) => Interest.find(query).sort({ submittedAt: -1 }).lean(),
+    find: async (query = {}) => {
+      const q = query.investor ? { investor: query.investor } : {};
+      return Interest.find(q).sort({ submittedAt: -1 }).lean();
+    },
     findById: async (id) => Interest.findById(id).lean(),
     create: async (payload) => {
       const doc = await Interest.create({
@@ -273,11 +276,37 @@ const DB = {
     },
     findByIdAndUpdate: async (id, updateData) =>
       Interest.findByIdAndUpdate(id, { $set: updateData }, { new: true }).lean(),
-    findByIdAndDelete: async (id) => Interest.findByIdAndDelete(id).lean()
+    findByIdAndDelete: async (id) => Interest.findByIdAndDelete(id).lean(),
+    populateAll: async (list) => {
+      if (!list.length) return [];
+      const users = await User.find({ _id: { $in: list.map(i => i.investor) } }).lean();
+      const projects = await Project.find({ _id: { $in: list.map(i => i.project) } }).lean();
+      const uMap = new Map(users.map(u => [u._id, u]));
+      const pMap = new Map(projects.map(p => [p._id, p]));
+      return list.map(item => {
+        const inv = uMap.get(item.investor);
+        const proj = pMap.get(item.project);
+        return {
+          ...item,
+          investor: inv ? { _id: inv._id, name: inv.name, email: inv.email } : null,
+          project: proj
+            ? { _id: proj._id, title: proj.title, category: proj.category, thumbnail: proj.thumbnail }
+            : null
+        };
+      });
+    }
   },
 
   investments: {
-    find: async (query = {}) => Investment.find(query).lean(),
+    find: async (query = {}) => {
+      const q = {};
+      if (query.investorId) q.investorId = query.investorId;
+      if (query.projectId) q.projectId = query.projectId;
+      if (query.status) q.status = query.status;
+      const data = await Investment.find(q).lean();
+      return data.sort((a, b) =>
+        new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
+    },
     findById: async (id) => Investment.findById(id).lean(),
     create: async (payload) => {
       const amount = Number(payload.amount) || 0;

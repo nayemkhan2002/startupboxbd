@@ -8,6 +8,57 @@
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
   <link rel="stylesheet" href="/assets/css/investor.css">
+  <style>
+    .searchable-select-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .searchable-select-dropdown {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 240px;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.15);
+      z-index: 999;
+      display: none;
+    }
+    .searchable-select-dropdown.show {
+      display: block;
+    }
+    .searchable-option {
+      padding: 10px 14px;
+      cursor: pointer;
+      border-bottom: 1px solid #f1f5f9;
+      transition: background 0.15s ease;
+    }
+    .searchable-option:last-child {
+      border-bottom: none;
+    }
+    .searchable-option:hover, .searchable-option.selected {
+      background: rgba(45, 93, 238, 0.08);
+    }
+    .searchable-option-name {
+      font-weight: 600;
+      color: #0f172a;
+      font-size: 0.9rem;
+    }
+    .searchable-option-sub {
+      font-size: 0.8rem;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .searchable-no-match {
+      padding: 14px;
+      color: #94a3b8;
+      font-size: 0.88rem;
+      text-align: center;
+    }
+  </style>
 </head>
 <body>
   <div class="admin-wrapper">
@@ -77,8 +128,12 @@
       <form id="assign-form">
         <input type="hidden" id="investment-id">
         <div class="form-group">
-          <label>Investor</label>
-          <select id="investorId" class="form-control" required></select>
+          <label>Investor <span style="color:var(--danger,#ef4444);">*</span></label>
+          <div class="searchable-select-wrap" id="investor-select-wrap">
+            <input type="hidden" id="investorId" required>
+            <input type="text" id="investorSearch" class="form-control" placeholder="🔍 Type to search investor by name or email…" autocomplete="off">
+            <div id="investorDropdown" class="searchable-select-dropdown"></div>
+          </div>
         </div>
         <div class="form-group">
           <label>Project</label>
@@ -180,6 +235,9 @@
 
       const modal = document.getElementById('assign-modal');
       const form = document.getElementById('assign-form');
+      const investorIdInput = document.getElementById('investorId');
+      const investorSearchInput = document.getElementById('investorSearch');
+      const investorDropdown = document.getElementById('investorDropdown');
       const projectSelect = document.getElementById('projectId');
       const shareHint = document.getElementById('share-price-hint');
       const sharesInput = document.getElementById('sharesCount');
@@ -187,6 +245,7 @@
       const returnEarnedInput = document.getElementById('returnEarned');
       const profitNotAssignedCheck = document.getElementById('profitNotAssigned');
 
+      let allInvestorsList = [];
       let projectMap = new Map();
 
       const [investors, projects] = await Promise.all([
@@ -194,11 +253,60 @@
         apiFetch('/projects')
       ]);
 
+      allInvestorsList = (investors || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       (projects || []).forEach(p => projectMap.set(String(p._id), p));
 
-      document.getElementById('investorId').innerHTML =
-        `<option value="">Select investor</option>` +
-        investors.map((i) => `<option value="${escapeHtml(i._id)}">${escapeHtml(i.name)} (${escapeHtml(i.email)})</option>`).join('');
+      const renderInvestorDropdown = (query = '') => {
+        const q = query.toLowerCase().trim();
+        const matches = allInvestorsList.filter((inv) =>
+          (inv.name || '').toLowerCase().includes(q) ||
+          (inv.email || '').toLowerCase().includes(q) ||
+          (inv.phone || '').toLowerCase().includes(q)
+        );
+
+        if (!matches.length) {
+          investorDropdown.innerHTML = `<div class="searchable-no-match">No investor matching "${escapeHtml(query)}"</div>`;
+        } else {
+          investorDropdown.innerHTML = matches.map((inv) => {
+            const isSelected = investorIdInput.value === inv._id;
+            const sub = [inv.email, inv.phone].filter(Boolean).map(escapeHtml).join(' • ');
+            return `
+              <div class="searchable-option ${isSelected ? 'selected' : ''}" data-id="${escapeHtml(inv._id)}" data-name="${escapeHtml(inv.name)}" data-email="${escapeHtml(inv.email || '')}">
+                <div class="searchable-option-name">${escapeHtml(inv.name)}</div>
+                ${sub ? `<div class="searchable-option-sub">${sub}</div>` : ''}
+              </div>`;
+          }).join('');
+        }
+        investorDropdown.classList.add('show');
+      };
+
+      investorSearchInput.addEventListener('focus', () => {
+        if (!investorSearchInput.disabled) {
+          renderInvestorDropdown(investorSearchInput.value);
+        }
+      });
+
+      investorSearchInput.addEventListener('input', () => {
+        investorIdInput.value = '';
+        renderInvestorDropdown(investorSearchInput.value);
+      });
+
+      investorDropdown.addEventListener('click', (e) => {
+        const option = e.target.closest('.searchable-option');
+        if (!option) return;
+        const id = option.dataset.id;
+        const name = option.dataset.name;
+        const email = option.dataset.email;
+        investorIdInput.value = id;
+        investorSearchInput.value = email ? `${name} (${email})` : name;
+        investorDropdown.classList.remove('show');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#investor-select-wrap')) {
+          investorDropdown.classList.remove('show');
+        }
+      });
 
       projectSelect.innerHTML =
         `<option value="">Select project</option>` +
@@ -260,6 +368,9 @@
       document.getElementById('assign-btn').addEventListener('click', () => {
         form.reset();
         document.getElementById('investment-id').value = '';
+        investorIdInput.value = '';
+        investorSearchInput.value = '';
+        investorSearchInput.disabled = false;
         document.getElementById('modal-title').textContent = 'Assign Investment';
         document.getElementById('startDate').value = '';
         sharesInput.value = '';
@@ -267,7 +378,6 @@
         returnEarnedInput.value = '';
         returnEarnedInput.disabled = false;
         profitNotAssignedCheck.checked = false;
-        document.getElementById('investorId').disabled = false;
         document.getElementById('error-msg').style.display = 'none';
         shareHint.style.display = 'none';
         modal.style.display = 'block';
@@ -284,8 +394,14 @@
           const item = allInvestments.find((i) => i._id === editBtn.dataset.id);
           if (!item) return;
           document.getElementById('investment-id').value = item._id;
-          document.getElementById('investorId').value = item.investorId;
-          document.getElementById('investorId').disabled = true;
+
+          investorIdInput.value = item.investorId;
+          const foundInv = allInvestorsList.find((inv) => inv._id === item.investorId) || item.investor;
+          investorSearchInput.value = foundInv
+            ? `${foundInv.name || 'Investor'} (${foundInv.email || ''})`
+            : (item.investor?.name || item.investorId);
+          investorSearchInput.disabled = true;
+
           document.getElementById('projectId').value = item.projectId;
           updateSharePriceUI();
 
@@ -330,6 +446,12 @@
         const btn = document.getElementById('save-btn');
         const errorDiv = document.getElementById('error-msg');
 
+        if (!investorIdInput.value) {
+          errorDiv.textContent = 'Please select a valid investor from the search list.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
         const durVal = document.getElementById('duration').value;
         const durUnit = document.getElementById('durationUnit').value;
         const durLabel = durVal ? `${durVal} ${durUnit.charAt(0).toUpperCase() + durUnit.slice(1)}` : '';
@@ -337,7 +459,7 @@
         const isUnassigned = profitNotAssignedCheck.checked || returnEarnedInput.value === '';
 
         const body = {
-          investorId: document.getElementById('investorId').value,
+          investorId: investorIdInput.value,
           projectId: document.getElementById('projectId').value,
           amount: Number(document.getElementById('amount').value),
           sharesCount: Number(document.getElementById('sharesCount').value) || 0,
@@ -362,7 +484,7 @@
             showToast('Investment assigned', 'success');
           }
           modal.style.display = 'none';
-          document.getElementById('investorId').disabled = false;
+          investorSearchInput.disabled = false;
           loadTable();
         } catch (err) {
           errorDiv.textContent = err.message;

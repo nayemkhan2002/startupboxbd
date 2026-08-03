@@ -237,6 +237,7 @@ const DB = {
         description: projectData.description,
         thumbnail: projectData.thumbnail || '',
         targetAmount: Number(projectData.targetAmount) || 0,
+        sharePrice: Number(projectData.sharePrice) || 0,
         raisedAmount: Number(projectData.raisedAmount) || 0,
         totalShares: Number(projectData.totalShares) || 0,
         duration: projectData.duration || '',
@@ -257,64 +258,48 @@ const DB = {
   },
 
   interests: {
-    find: async (query = {}) => {
-      const q = query.investor ? { investor: query.investor } : {};
-      return Interest.find(q).sort({ submittedAt: -1 }).lean();
-    },
-    create: async (interestData) => {
+    find: async (query = {}) => Interest.find(query).sort({ submittedAt: -1 }).lean(),
+    findById: async (id) => Interest.findById(id).lean(),
+    create: async (payload) => {
       const doc = await Interest.create({
-        investor: interestData.investor,
-        project: interestData.project,
-        amountIntended: Number(interestData.amountIntended) || 0,
-        message: interestData.message || '',
-        status: 'pending',
+        investor: payload.investor,
+        project: payload.project,
+        amountIntended: Number(payload.amountIntended) || 0,
+        message: payload.message || '',
+        status: payload.status || 'pending',
         submittedAt: new Date().toISOString()
       });
       return doc.toObject();
     },
     findByIdAndUpdate: async (id, updateData) =>
       Interest.findByIdAndUpdate(id, { $set: updateData }, { new: true }).lean(),
-    populateAll: async (list) => {
-      if (!list.length) return [];
-      const users = await User.find({ _id: { $in: list.map(i => i.investor) } }).lean();
-      const projects = await Project.find({ _id: { $in: list.map(i => i.project) } }).lean();
-      const uMap = new Map(users.map(u => [u._id, u]));
-      const pMap = new Map(projects.map(p => [p._id, p]));
-      return list.map(item => {
-        const inv = uMap.get(item.investor);
-        const proj = pMap.get(item.project);
-        return {
-          ...item,
-          investor: inv ? { _id: inv._id, name: inv.name, email: inv.email } : null,
-          project: proj
-            ? { _id: proj._id, title: proj.title, category: proj.category, thumbnail: proj.thumbnail }
-            : null
-        };
-      });
-    }
+    findByIdAndDelete: async (id) => Interest.findByIdAndDelete(id).lean()
   },
 
   investments: {
-    find: async (query = {}) => {
-      const q = {};
-      if (query.investorId) q.investorId = query.investorId;
-      if (query.projectId) q.projectId = query.projectId;
-      if (query.status) q.status = query.status;
-      const data = await Investment.find(q).lean();
-      // createdAt||startDate fallback can't be expressed in a Mongo sort.
-      return data.sort((a, b) =>
-        new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
-    },
+    find: async (query = {}) => Investment.find(query).lean(),
     findById: async (id) => Investment.findById(id).lean(),
     create: async (payload) => {
       const amount = Number(payload.amount) || 0;
       const roi = Number(payload.roi) || 0;
       const durationMonths = parseDurationMonths(payload.duration);
-      const startDate = payload.startDate || new Date().toISOString();
-      const maturityDate = payload.maturityDate || addMonths(startDate, durationMonths);
+      const startDate = payload.startDate || null;
+      const maturityDate = payload.maturityDate || (startDate ? addMonths(startDate, durationMonths || 12) : null);
       const expectedReturn = payload.expectedReturn != null
         ? Number(payload.expectedReturn)
         : calcExpectedReturn(amount, roi);
+
+      const unit = payload.durationUnit || 'months';
+      let label = payload.durationLabel;
+      if (!label && payload.duration) {
+        label = `${payload.duration} ${unit.charAt(0).toUpperCase() + unit.slice(1)}`;
+      }
+
+      const profitNotAssigned = Boolean(payload.profitNotAssigned);
+      let returnEarned = null;
+      if (!profitNotAssigned && payload.returnEarned !== undefined && payload.returnEarned !== null && payload.returnEarned !== '') {
+        returnEarned = Number(payload.returnEarned);
+      }
 
       const doc = await Investment.create({
         investorId: payload.investorId,
@@ -322,16 +307,17 @@ const DB = {
         amount,
         sharesCount: Number(payload.sharesCount || payload.shares) || 0,
         roi,
-        duration: durationMonths || payload.duration || 0,
-        durationLabel: payload.durationLabel
-          || (durationMonths ? `${durationMonths} Months` : String(payload.duration || '')),
+        duration: payload.duration || durationMonths || 0,
+        durationUnit: unit,
+        durationLabel: label || (durationMonths ? `${durationMonths} Months` : String(payload.duration || '')),
         startDate,
         maturityDate,
         expectedReturn,
-        returnEarned: Number(payload.returnEarned) || 0,
+        returnEarned,
+        profitNotAssigned,
         status: payload.status || 'active',
         paymentHistory: payload.paymentHistory || [
-          { type: 'investment', label: 'Initial Investment Allocated', amount, date: startDate }
+          { type: 'investment', label: 'Initial Investment Allocated', amount, date: startDate || new Date().toISOString() }
         ],
         timeline: payload.timeline || [
           { key: 'approved', label: 'Investment Approved', date: startDate, done: true },

@@ -83,25 +83,32 @@
         <div class="form-group">
           <label>Project</label>
           <select id="projectId" class="form-control" required></select>
+          <div id="share-price-hint" style="font-size:0.85rem;color:var(--gold-dark);font-weight:600;margin-top:6px;display:none;"></div>
         </div>
         <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:140px;">
-            <label>Amount (৳)</label>
-            <input type="number" id="amount" class="form-control" required min="1">
-          </div>
           <div style="flex:1;min-width:140px;">
             <label>Shares Count</label>
-            <input type="number" id="sharesCount" class="form-control" placeholder="e.g. 100" min="0">
+            <input type="number" id="sharesCount" class="form-control" placeholder="e.g. 4" min="0">
+          </div>
+          <div style="flex:1;min-width:140px;">
+            <label>Amount (৳)</label>
+            <input type="number" id="amount" class="form-control" required min="1" placeholder="Auto-calculated or enter">
           </div>
         </div>
         <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:140px;">
-            <label>Duration (months)</label>
-            <input type="number" id="duration" class="form-control" required min="1" placeholder="e.g. 24">
+            <label>Duration</label>
+            <div style="display:flex;gap:6px;">
+              <input type="number" id="duration" class="form-control" placeholder="e.g. 12" min="1" style="flex:1;">
+              <select id="durationUnit" class="form-control" style="width:110px;">
+                <option value="months">Months</option>
+                <option value="weeks">Weeks</option>
+              </select>
+            </div>
           </div>
           <div style="flex:1;min-width:140px;">
-            <label>Start Date</label>
-            <input type="date" id="startDate" class="form-control" required>
+            <label>Start Date <small class="text-muted">(Optional)</small></label>
+            <input type="date" id="startDate" class="form-control">
           </div>
         </div>
         <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
@@ -115,8 +122,12 @@
             </select>
           </div>
           <div style="flex:1;min-width:140px;">
-            <label>Return Earned (৳)</label>
-            <input type="number" id="returnEarned" class="form-control" min="0" value="0">
+            <label>Return Earned (৳) <small class="text-muted">(Optional)</small></label>
+            <input type="number" id="returnEarned" class="form-control" min="0" placeholder="e.g. 5000">
+            <div style="margin-top:6px;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" id="profitNotAssigned">
+              <label for="profitNotAssigned" style="font-size:0.85rem;font-weight:normal;margin:0;cursor:pointer;color:var(--text-muted);">Profit not assigned yet</label>
+            </div>
           </div>
         </div>
         <div class="form-group">
@@ -150,7 +161,7 @@
           <td>${formatMoney(i.amount)}</td>
           <td><strong>${i.sharesCount ? Number(i.sharesCount).toLocaleString() : '0'}</strong></td>
           <td class="text-success">${formatMoney(i.expectedReturn)}</td>
-          <td>${formatMoney(i.returnEarned || 0)}</td>
+          <td><span class="${i.profitNotAssigned || i.returnEarned == null ? 'text-muted' : ''}">${escapeHtml(formatReturnEarned(i))}</span></td>
           <td><span class="${invStatusClass(i.status)}">${escapeHtml(i.status)}</span></td>
           <td>
             <div class="action-btns">
@@ -169,21 +180,80 @@
 
       const modal = document.getElementById('assign-modal');
       const form = document.getElementById('assign-form');
+      const projectSelect = document.getElementById('projectId');
+      const shareHint = document.getElementById('share-price-hint');
+      const sharesInput = document.getElementById('sharesCount');
+      const amountInput = document.getElementById('amount');
+      const returnEarnedInput = document.getElementById('returnEarned');
+      const profitNotAssignedCheck = document.getElementById('profitNotAssigned');
+
+      let projectMap = new Map();
 
       const [investors, projects] = await Promise.all([
         apiFetch('/profile/investors'),
         apiFetch('/projects')
       ]);
 
+      (projects || []).forEach(p => projectMap.set(String(p._id), p));
+
       document.getElementById('investorId').innerHTML =
         `<option value="">Select investor</option>` +
         investors.map((i) => `<option value="${escapeHtml(i._id)}">${escapeHtml(i.name)} (${escapeHtml(i.email)})</option>`).join('');
 
-      document.getElementById('projectId').innerHTML =
+      projectSelect.innerHTML =
         `<option value="">Select project</option>` +
         projects.map((p) => `<option value="${escapeHtml(p._id)}">${escapeHtml(p.title)}</option>`).join('');
 
-      document.getElementById('startDate').value = new Date().toISOString().slice(0, 10);
+      const getSelectedProjectSharePrice = () => {
+        const p = projectMap.get(projectSelect.value);
+        if (!p) return 0;
+        return Number(p.sharePrice) || Number(p.targetAmount) || 0;
+      };
+
+      const updateSharePriceUI = () => {
+        const p = projectMap.get(projectSelect.value);
+        if (p) {
+          const sp = getSelectedProjectSharePrice();
+          shareHint.textContent = sp ? `Share Price: ৳${sp.toLocaleString()} per share` : 'Share Price: Not defined';
+          shareHint.style.display = 'block';
+        } else {
+          shareHint.style.display = 'none';
+        }
+      };
+
+      projectSelect.addEventListener('change', () => {
+        updateSharePriceUI();
+        const sp = getSelectedProjectSharePrice();
+        if (sp > 0 && sharesInput.value) {
+          amountInput.value = Math.round(Number(sharesInput.value) * sp);
+        } else if (sp > 0 && amountInput.value && !sharesInput.value) {
+          sharesInput.value = Math.floor(Number(amountInput.value) / sp);
+        }
+      });
+
+      sharesInput.addEventListener('input', () => {
+        const sp = getSelectedProjectSharePrice();
+        if (sp > 0 && sharesInput.value !== '') {
+          amountInput.value = Math.round(Number(sharesInput.value) * sp);
+        }
+      });
+
+      amountInput.addEventListener('input', () => {
+        const sp = getSelectedProjectSharePrice();
+        if (sp > 0 && amountInput.value !== '') {
+          const shares = Math.floor(Number(amountInput.value) / sp);
+          if (shares >= 0) sharesInput.value = shares;
+        }
+      });
+
+      profitNotAssignedCheck.addEventListener('change', () => {
+        if (profitNotAssignedCheck.checked) {
+          returnEarnedInput.value = '';
+          returnEarnedInput.disabled = true;
+        } else {
+          returnEarnedInput.disabled = false;
+        }
+      });
 
       await loadTable();
 
@@ -191,11 +261,15 @@
         form.reset();
         document.getElementById('investment-id').value = '';
         document.getElementById('modal-title').textContent = 'Assign Investment';
-        document.getElementById('startDate').value = new Date().toISOString().slice(0, 10);
-        document.getElementById('sharesCount').value = '';
-        document.getElementById('returnEarned').value = 0;
+        document.getElementById('startDate').value = '';
+        sharesInput.value = '';
+        amountInput.value = '';
+        returnEarnedInput.value = '';
+        returnEarnedInput.disabled = false;
+        profitNotAssignedCheck.checked = false;
         document.getElementById('investorId').disabled = false;
         document.getElementById('error-msg').style.display = 'none';
+        shareHint.style.display = 'none';
         modal.style.display = 'block';
       });
 
@@ -213,12 +287,25 @@
           document.getElementById('investorId').value = item.investorId;
           document.getElementById('investorId').disabled = true;
           document.getElementById('projectId').value = item.projectId;
+          updateSharePriceUI();
+
           document.getElementById('amount').value = item.amount;
           document.getElementById('sharesCount').value = item.sharesCount || '';
           document.getElementById('duration').value = item.duration || '';
+          document.getElementById('durationUnit').value = item.durationUnit || 'months';
           document.getElementById('startDate').value = item.startDate ? String(item.startDate).slice(0, 10) : '';
-          document.getElementById('status').value = item.status;
-          document.getElementById('returnEarned').value = item.returnEarned || 0;
+          document.getElementById('status').value = item.status || 'active';
+
+          if (item.profitNotAssigned || item.returnEarned == null) {
+            profitNotAssignedCheck.checked = true;
+            returnEarnedInput.value = '';
+            returnEarnedInput.disabled = true;
+          } else {
+            profitNotAssignedCheck.checked = false;
+            returnEarnedInput.disabled = false;
+            returnEarnedInput.value = item.returnEarned;
+          }
+
           document.getElementById('notes').value = item.notes || '';
           document.getElementById('modal-title').textContent = 'Edit Investment';
           modal.style.display = 'block';
@@ -242,15 +329,25 @@
         const id = document.getElementById('investment-id').value;
         const btn = document.getElementById('save-btn');
         const errorDiv = document.getElementById('error-msg');
+
+        const durVal = document.getElementById('duration').value;
+        const durUnit = document.getElementById('durationUnit').value;
+        const durLabel = durVal ? `${durVal} ${durUnit.charAt(0).toUpperCase() + durUnit.slice(1)}` : '';
+
+        const isUnassigned = profitNotAssignedCheck.checked || returnEarnedInput.value === '';
+
         const body = {
           investorId: document.getElementById('investorId').value,
           projectId: document.getElementById('projectId').value,
           amount: Number(document.getElementById('amount').value),
           sharesCount: Number(document.getElementById('sharesCount').value) || 0,
-          duration: Number(document.getElementById('duration').value),
-          startDate: document.getElementById('startDate').value,
+          duration: durVal ? Number(durVal) : null,
+          durationUnit: durUnit,
+          durationLabel: durLabel,
+          startDate: document.getElementById('startDate').value || null,
           status: document.getElementById('status').value,
-          returnEarned: Number(document.getElementById('returnEarned').value) || 0,
+          profitNotAssigned: isUnassigned,
+          returnEarned: isUnassigned ? null : Number(returnEarnedInput.value),
           notes: document.getElementById('notes').value
         };
 

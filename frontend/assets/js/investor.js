@@ -46,9 +46,23 @@ const formatDate = (d) => {
 };
 
 const durationLabel = (inv) => {
+  if (!inv) return '—';
   if (inv.durationLabel) return inv.durationLabel;
-  if (inv.duration) return `${inv.duration} Months`;
-  return '—';
+  if (!inv.duration) return '—';
+  const unit = (inv.durationUnit || 'months').toLowerCase();
+  if (unit === 'weeks') return `${inv.duration} Weeks`;
+  if (unit === 'months') return `${inv.duration} Months`;
+  return `${inv.duration}`;
+};
+
+const formatReturnEarned = (inv) => {
+  if (!inv) return 'Profit not assigned yet';
+  if (inv.profitNotAssigned || inv.returnEarned === null || inv.returnEarned === undefined || inv.returnEarned === '') {
+    return 'Profit not assigned yet';
+  }
+  const num = Number(inv.returnEarned);
+  if (Number.isNaN(num)) return 'Profit not assigned yet';
+  return formatMoney(num);
 };
 
 const syncLocalUser = (profile) => {

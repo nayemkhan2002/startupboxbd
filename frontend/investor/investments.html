@@ -86,7 +86,7 @@
               <div class="cell"><small>Expected Return</small><strong class="text-success">${formatMoney(inv.expectedReturn)}</strong></div>
               <div class="cell"><small>Duration</small><strong>${escapeHtml(durationLabel(inv))}</strong></div>
               <div class="cell"><small>Maturity</small><strong>${formatDate(inv.maturityDate)}</strong></div>
-              <div class="cell"><small>Earned</small><strong>${formatMoney(inv.returnEarned || (inv.status === 'completed' ? inv.expectedReturn : 0))}</strong></div>
+              <div class="cell"><small>Earned</small><strong class="${inv.profitNotAssigned || inv.returnEarned == null ? 'text-muted' : ''}">${escapeHtml(formatReturnEarned(inv))}</strong></div>
             </div>
             <a class="btn btn-outline btn-block" href="/investor/investment.html?id=${encodeURIComponent(inv._id)}">View Details</a>
           </div>

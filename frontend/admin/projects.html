@@ -111,6 +111,10 @@
             <input type="number" id="targetAmount" class="form-control" required>
           </div>
           <div style="flex:1;min-width:130px;">
+            <label>Share Price (৳)</label>
+            <input type="number" id="sharePrice" class="form-control" placeholder="e.g. 15000" min="0">
+          </div>
+          <div style="flex:1;min-width:130px;">
             <label>Total Shares</label>
             <input type="number" id="totalShares" class="form-control" placeholder="e.g. 1000" min="0">
           </div>
@@ -221,6 +225,7 @@
       document.getElementById('add-btn').addEventListener('click', () => {
         form.reset();
         document.getElementById('project-id').value = '';
+        document.getElementById('sharePrice').value = '';
         document.getElementById('totalShares').value = '';
         thumbnailUrlInput.value = '';
         previewImg.style.display = 'none';
@@ -252,6 +257,7 @@
           document.getElementById('category').value = project.category;
           document.getElementById('description').value = project.description;
           document.getElementById('targetAmount').value = project.targetAmount;
+          document.getElementById('sharePrice').value = project.sharePrice || project.targetAmount || '';
           document.getElementById('totalShares').value = project.totalShares || '';
           document.getElementById('duration').value = project.duration || '';
           document.getElementById('deadline').value = project.deadline ? String(project.deadline).split('T')[0] : '';
@@ -317,12 +323,16 @@
             ? milestonesRaw.split('\n').map((m) => m.trim()).filter(Boolean)
             : [];
 
+          const targetVal = Number(document.getElementById('targetAmount').value);
+          const sharePriceVal = Number(document.getElementById('sharePrice').value) || targetVal;
+
           const body = {
             title: document.getElementById('title').value,
             category: document.getElementById('category').value,
             description: document.getElementById('description').value,
             thumbnail: finalThumbnail,
-            targetAmount: Number(document.getElementById('targetAmount').value),
+            targetAmount: targetVal,
+            sharePrice: sharePriceVal,
             totalShares: Number(document.getElementById('totalShares').value) || 0,
             duration: document.getElementById('duration').value,
             deadline: document.getElementById('deadline').value,

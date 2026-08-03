@@ -123,7 +123,7 @@
                 <div class="summary-row"><span class="label">Shares Owned</span><span class="value"><strong>${inv.sharesCount ? Number(inv.sharesCount).toLocaleString() : '—'}</strong></span></div>
                 <div class="summary-row"><span class="label">Expected Profit</span><span class="value text-success">${formatMoney(inv.expectedReturn)}</span></div>
                 <div class="summary-row"><span class="label">Total Expected Return</span><span class="value">${formatMoney(totalExpected)}</span></div>
-                <div class="summary-row"><span class="label">Return Earned</span><span class="value text-success">${formatMoney(earned)}</span></div>
+                <div class="summary-row"><span class="label">Return Earned</span><span class="value ${inv.profitNotAssigned || inv.returnEarned == null ? 'text-muted' : 'text-success'}">${escapeHtml(formatReturnEarned(inv))}</span></div>
                 <div class="summary-row"><span class="label">Duration</span><span class="value">${escapeHtml(durationLabel(inv))}</span></div>
                 <div class="summary-row"><span class="label">Start Date</span><span class="value">${formatDate(inv.startDate)}</span></div>
                 <div class="summary-row"><span class="label">Maturity Date</span><span class="value">${formatDate(inv.maturityDate)}</span></div>

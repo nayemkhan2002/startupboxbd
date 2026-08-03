@@ -299,6 +299,7 @@ const DB = {
         description: projectData.description,
         thumbnail: projectData.thumbnail || '',
         targetAmount: Number(projectData.targetAmount) || 0,
+        sharePrice: Number(projectData.sharePrice) || 0,
         raisedAmount: Number(projectData.raisedAmount) || 0,
         totalShares: Number(projectData.totalShares) || 0,
         duration: projectData.duration || '',
@@ -394,11 +395,23 @@ const DB = {
       const amount = Number(payload.amount) || 0;
       const roi = Number(payload.roi) || 0;
       const durationMonths = parseDurationMonths(payload.duration);
-      const startDate = payload.startDate || new Date().toISOString();
-      const maturityDate = payload.maturityDate || addMonths(startDate, durationMonths);
+      const startDate = payload.startDate || null;
+      const maturityDate = payload.maturityDate || (startDate ? addMonths(startDate, durationMonths || 12) : null);
       const expectedReturn = payload.expectedReturn != null
         ? Number(payload.expectedReturn)
         : calcExpectedReturn(amount, roi);
+
+      const unit = payload.durationUnit || 'months';
+      let label = payload.durationLabel;
+      if (!label && payload.duration) {
+        label = `${payload.duration} ${unit.charAt(0).toUpperCase() + unit.slice(1)}`;
+      }
+
+      const profitNotAssigned = Boolean(payload.profitNotAssigned);
+      let returnEarned = null;
+      if (!profitNotAssigned && payload.returnEarned !== undefined && payload.returnEarned !== null && payload.returnEarned !== '') {
+        returnEarned = Number(payload.returnEarned);
+      }
 
       const newItem = {
         _id: generateId(),
@@ -407,19 +420,21 @@ const DB = {
         amount,
         sharesCount: Number(payload.sharesCount || payload.shares) || 0,
         roi,
-        duration: durationMonths || payload.duration || 0,
-        durationLabel: payload.durationLabel || (durationMonths ? `${durationMonths} Months` : String(payload.duration || '')),
+        duration: payload.duration || durationMonths || 0,
+        durationUnit: unit,
+        durationLabel: label || (durationMonths ? `${durationMonths} Months` : String(payload.duration || '')),
         startDate,
         maturityDate,
         expectedReturn,
-        returnEarned: Number(payload.returnEarned) || 0,
+        returnEarned,
+        profitNotAssigned,
         status: payload.status || 'active',
         paymentHistory: payload.paymentHistory || [
           {
             type: 'investment',
             label: 'Initial Investment Allocated',
             amount,
-            date: startDate
+            date: startDate || new Date().toISOString()
           }
         ],
         timeline: payload.timeline || [

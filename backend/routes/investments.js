@@ -66,7 +66,7 @@ router.get('/:id', protect, async (req, res) => {
 // Admin: assign investment to investor
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { investorId, projectId, amount, sharesCount, shares, roi, duration, startDate, status, notes, returnEarned } = req.body;
+    const { investorId, projectId, amount, sharesCount, shares, roi, duration, durationUnit, durationLabel, startDate, status, notes, returnEarned, profitNotAssigned } = req.body;
     if (!investorId || !projectId || !amount) {
       return res.status(400).json({ message: 'investorId, projectId and amount are required' });
     }
@@ -84,13 +84,13 @@ router.post('/', protect, adminOnly, async (req, res) => {
       sharesCount: sharesCount || shares || 0,
       roi,
       duration,
-      durationLabel: typeof duration === 'string' && /month/i.test(duration)
-        ? duration
-        : undefined,
-      startDate,
+      durationUnit: durationUnit || 'months',
+      durationLabel,
+      startDate: startDate || null,
       status: status || 'active',
       notes,
-      returnEarned
+      returnEarned,
+      profitNotAssigned: Boolean(profitNotAssigned)
     });
     const [populated] = await DB.investments.populateAll([investment]);
     res.status(201).json(populated);

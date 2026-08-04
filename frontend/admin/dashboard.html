@@ -113,8 +113,12 @@
 
         <form class="profit-upload-form" id="profit-upload-form">
           <div class="form-group">
-            <label for="profit-image">Profit Image *</label>
-            <input type="file" id="profit-image" accept="image/*" required>
+            <label for="profit-image">Upload Image File</label>
+            <input type="file" id="profit-image" accept="image/*">
+          </div>
+          <div class="form-group">
+            <label for="profit-image-url">OR Paste Image URL</label>
+            <input type="url" id="profit-image-url" placeholder="https://domain.com/image.png">
           </div>
           <div class="form-group">
             <label for="profit-caption">Caption (optional)</label>
@@ -185,16 +189,22 @@
       uploadForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const fileInput = document.getElementById('profit-image');
+        const urlInput = document.getElementById('profit-image-url');
         const captionInput = document.getElementById('profit-caption');
         const uploadBtn = document.getElementById('profit-upload-btn');
 
-        if (!fileInput.files.length) {
-          showToast('Please select an image', 'error');
+        if (!fileInput.files.length && !urlInput.value.trim()) {
+          showToast('Please select an image file or paste an Image URL', 'error');
           return;
         }
 
         const formData = new FormData();
-        formData.append('image', fileInput.files[0]);
+        if (fileInput.files.length) {
+          formData.append('image', fileInput.files[0]);
+        }
+        if (urlInput.value.trim()) {
+          formData.append('imageUrl', urlInput.value.trim());
+        }
         formData.append('caption', captionInput.value.trim());
 
         uploadBtn.disabled = true;
@@ -202,8 +212,9 @@
 
         try {
           await apiFetch('/profit-images', { method: 'POST', body: formData });
-          showToast('Profit image uploaded!', 'success');
+          showToast('Profit image saved successfully!', 'success');
           fileInput.value = '';
+          urlInput.value = '';
           captionInput.value = '';
           await loadProfitImages();
         } catch (err) {

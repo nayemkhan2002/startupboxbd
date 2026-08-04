@@ -385,18 +385,22 @@
   <script>
     // ─── Profit List Grid ───
     document.addEventListener('DOMContentLoaded', async () => {
-      const section = document.getElementById('profit-images');
       const grid = document.getElementById('profit-list-grid');
       const countEl = document.getElementById('profit-count');
 
       try {
         const images = await apiFetch('/profit-images');
+        countEl.textContent = `${images.length} ${images.length === 1 ? 'update' : 'updates'}`;
+
         if (!images.length) {
-          section.style.display = 'none';
+          grid.innerHTML = `
+            <div class="empty-state surface-card" style="grid-column:1/-1;">
+              <div class="empty-icon">📈</div>
+              <h3>No profit list updates yet</h3>
+              <p>Weekly profit graphics uploaded by admin will appear here.</p>
+            </div>`;
           return;
         }
-
-        countEl.textContent = `${images.length} ${images.length === 1 ? 'update' : 'updates'}`;
 
         grid.innerHTML = images.map((img) => `
           <article class="profit-list-card">
@@ -408,7 +412,7 @@
         `).join('');
       } catch (err) {
         console.error('Profit list load error:', err);
-        section.style.display = 'none';
+        grid.innerHTML = `<div class="empty-state surface-card" style="grid-column:1/-1;"><h3>Unable to load profit updates</h3><p>${escapeHtml(err.message)}</p></div>`;
       }
     });
   </script>

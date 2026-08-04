@@ -105,6 +105,28 @@
           <a href="/admin/investors.html" class="btn btn-outline">Review Interests</a>
         </div>
       </div>
+
+      <!-- Profit Images Upload Panel -->
+      <div class="profit-upload-panel">
+        <h2>📊 সাপ্তাহিক মুনাফা — Weekly Profit Images</h2>
+        <p class="panel-desc">Upload profit list images to show on the homepage. Visitors will see these above Featured Projects.</p>
+
+        <form class="profit-upload-form" id="profit-upload-form">
+          <div class="form-group">
+            <label for="profit-image">Profit Image *</label>
+            <input type="file" id="profit-image" accept="image/*" required>
+          </div>
+          <div class="form-group">
+            <label for="profit-caption">Caption (optional)</label>
+            <input type="text" id="profit-caption" placeholder="e.g. সাপ্তাহিক মুনাফা — ২৮ জুলাই ২০২৬">
+          </div>
+          <button type="submit" class="btn btn-sm" id="profit-upload-btn">Upload</button>
+        </form>
+
+        <div class="profit-images-grid" id="profit-images-grid">
+          <div class="text-muted" style="grid-column:1/-1;text-align:center;padding:24px;">Loading…</div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -124,6 +146,30 @@
         </div>`).join('');
     };
 
+    // ─── Profit Images Management ───
+    const loadProfitImages = async () => {
+      const grid = document.getElementById('profit-images-grid');
+      try {
+        const images = await apiFetch('/profit-images');
+        if (!images.length) {
+          grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;text-align:center;padding:24px;"><p>No profit images uploaded yet.</p></div>';
+          return;
+        }
+        grid.innerHTML = images.map((img) => `
+          <div class="profit-img-card" data-id="${escapeHtml(img._id)}">
+            <img src="${escapeHtml(img.imageUrl)}" alt="${escapeHtml(img.caption || 'Profit')}">
+            <button type="button" class="profit-img-delete" title="Delete" data-id="${escapeHtml(img._id)}">✕</button>
+            <div class="profit-img-card-body">
+              ${img.caption ? `<div class="profit-img-caption" title="${escapeHtml(img.caption)}">${escapeHtml(img.caption)}</div>` : ''}
+              <div class="profit-img-date">${new Date(img.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        grid.innerHTML = `<div class="text-muted" style="grid-column:1/-1;text-align:center;padding:24px;">${escapeHtml(err.message)}</div>`;
+      }
+    };
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('admin');
       if (!user) return;
@@ -133,6 +179,59 @@
       document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.admin-sidebar');
+
+      // ─── Profit Image Upload ───
+      const uploadForm = document.getElementById('profit-upload-form');
+      uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById('profit-image');
+        const captionInput = document.getElementById('profit-caption');
+        const uploadBtn = document.getElementById('profit-upload-btn');
+
+        if (!fileInput.files.length) {
+          showToast('Please select an image', 'error');
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+        formData.append('caption', captionInput.value.trim());
+
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading…';
+
+        try {
+          await apiFetch('/profit-images', { method: 'POST', body: formData });
+          showToast('Profit image uploaded!', 'success');
+          fileInput.value = '';
+          captionInput.value = '';
+          await loadProfitImages();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          uploadBtn.disabled = false;
+          uploadBtn.textContent = 'Upload';
+        }
+      });
+
+      // ─── Delete profit image ───
+      document.getElementById('profit-images-grid').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.profit-img-delete');
+        if (!btn) return;
+        const id = btn.dataset.id;
+        const confirmed = await confirmDialog('Delete this profit image?', { title: 'Delete Image', confirmText: 'Delete', danger: true });
+        if (!confirmed) return;
+        try {
+          await apiFetch(`/profit-images/${id}`, { method: 'DELETE' });
+          showToast('Image deleted', 'success');
+          await loadProfitImages();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+
+      // Load profit images
+      await loadProfitImages();
 
       try {
         const [projects, interests] = await Promise.all([

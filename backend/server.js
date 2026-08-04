@@ -27,6 +27,7 @@ app.use('/api/investments', require('./routes/investments'));
 app.use('/api/withdrawals', require('./routes/withdrawals'));
 app.use('/api/profile', require('./routes/profile'));
 app.use('/api/payouts', require('./routes/payouts'));
+app.use('/api/profit-images', require('./routes/profitImages'));
 
 // Fallback for root
 app.get('/', (req, res) => {

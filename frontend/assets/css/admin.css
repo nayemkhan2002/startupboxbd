@@ -356,3 +356,161 @@
     grid-template-columns: 80px 1fr 36px;
   }
 }
+
+/* =========================================================
+   Profit Images Management (Admin)
+   ========================================================= */
+
+.profit-upload-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
+  margin-top: 24px;
+}
+
+.profit-upload-panel h2 {
+  font-size: 1.15rem;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.profit-upload-panel .panel-desc {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-bottom: 18px;
+}
+
+.profit-upload-form {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  padding: 18px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border-strong);
+  margin-bottom: 20px;
+}
+
+.profit-upload-form .form-group {
+  flex: 1;
+  min-width: 180px;
+}
+
+.profit-upload-form label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.profit-upload-form input[type="file"],
+.profit-upload-form input[type="text"] {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--text);
+}
+
+.profit-upload-form input[type="file"] {
+  padding: 8px;
+  cursor: pointer;
+}
+
+.profit-upload-form input:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+
+.profit-images-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.profit-img-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+  transition: box-shadow 0.25s ease;
+}
+
+.profit-img-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.profit-img-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+
+.profit-img-card-body {
+  padding: 10px 12px;
+}
+
+.profit-img-card-body .profit-img-caption {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profit-img-card-body .profit-img-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-en);
+}
+
+.profit-img-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(231, 76, 60, 0.9);
+  color: #fff;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.profit-img-card:hover .profit-img-delete {
+  opacity: 1;
+}
+
+.profit-img-delete:hover {
+  background: var(--danger);
+  transform: scale(1.1);
+}
+
+@media (max-width: 640px) {
+  .profit-upload-form {
+    flex-direction: column;
+  }
+
+  .profit-images-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}

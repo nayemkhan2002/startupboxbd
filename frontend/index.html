@@ -155,6 +155,23 @@
     </div>
   </section>
 
+  <section class="section profit-images-section" id="profit-images" style="background:#F8FAFC;color:#0F172A;">
+    <div class="container">
+      <div class="section-header flex-between" style="max-width:none;display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:16px;">
+        <div>
+          <h2>Profit List</h2>
+          <p>Weekly profit updates from our running projects.</p>
+        </div>
+        <span class="text-muted" id="profit-count">Loading…</span>
+      </div>
+      <div class="profit-list-grid" id="profit-list-grid">
+        <div class="surface-card skeleton skeleton-card"></div>
+        <div class="surface-card skeleton skeleton-card"></div>
+        <div class="surface-card skeleton skeleton-card"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="projects" style="background:#F8FAFC;color:#0F172A;">
     <div class="container">
       <div class="section-header flex-between" style="max-width:none;display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:16px;">
@@ -362,6 +379,36 @@
       } catch (err) {
         console.error(err);
         closedContainer.innerHTML = `<div class="empty-state surface-card" style="grid-column:1/-1;"><h3>Unable to load closed projects</h3><p>${escapeHtml(err.message)}</p></div>`;
+      }
+    });
+  </script>
+  <script>
+    // ─── Profit List Grid ───
+    document.addEventListener('DOMContentLoaded', async () => {
+      const section = document.getElementById('profit-images');
+      const grid = document.getElementById('profit-list-grid');
+      const countEl = document.getElementById('profit-count');
+
+      try {
+        const images = await apiFetch('/profit-images');
+        if (!images.length) {
+          section.style.display = 'none';
+          return;
+        }
+
+        countEl.textContent = `${images.length} ${images.length === 1 ? 'update' : 'updates'}`;
+
+        grid.innerHTML = images.map((img) => `
+          <article class="profit-list-card">
+            <div class="profit-list-card-media">
+              <img src="${escapeHtml(img.imageUrl)}" alt="${escapeHtml(img.caption || 'Profit List')}" loading="lazy">
+            </div>
+            ${img.caption ? `<div class="profit-list-card-body"><p>${escapeHtml(img.caption)}</p></div>` : ''}
+          </article>
+        `).join('');
+      } catch (err) {
+        console.error('Profit list load error:', err);
+        section.style.display = 'none';
       }
     });
   </script>

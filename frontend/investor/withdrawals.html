@@ -236,8 +236,28 @@
         e.preventDefault();
         const btn = document.getElementById('submit-withdraw');
         const errorDiv = document.getElementById('error-msg');
+        errorDiv.style.display = 'none';
+
         const method = document.querySelector('input[name="method"]:checked').value;
         const amount = Number(document.getElementById('amount').value);
+
+        if (!amount || amount <= 0) {
+          errorDiv.textContent = 'Please enter a valid withdrawal amount.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        if (availableBalance <= 0) {
+          errorDiv.textContent = 'You do not have any available earned returns balance to withdraw yet.';
+          errorDiv.style.display = 'block';
+          return;
+        }
+
+        if (amount > availableBalance) {
+          errorDiv.textContent = `Amount exceeds your available balance (৳${availableBalance.toLocaleString()}).`;
+          errorDiv.style.display = 'block';
+          return;
+        }
 
         const paymentInfo = method === 'bkash'
           ? {
@@ -252,6 +272,20 @@
               branch: document.getElementById('branch').value.trim(),
               routingNumber: document.getElementById('routingNumber').value.trim()
             };
+
+        if (method === 'bkash') {
+          if (!paymentInfo.bkashNumber || !paymentInfo.accountName) {
+            errorDiv.textContent = 'Please provide your bKash number and account holder name.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        } else if (method === 'bank') {
+          if (!paymentInfo.bankName || !paymentInfo.accountName || !paymentInfo.accountNumber) {
+            errorDiv.textContent = 'Please provide Bank Name, Account Holder Name, and Account Number.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        }
 
         try {
           btn.disabled = true;

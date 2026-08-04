@@ -162,10 +162,12 @@
         grid.innerHTML = images.map((img) => `
           <div class="profit-img-card" data-id="${escapeHtml(img._id)}">
             <img src="${escapeHtml(img.imageUrl)}" alt="${escapeHtml(img.caption || 'Profit')}">
-            <button type="button" class="profit-img-delete" title="Delete" data-id="${escapeHtml(img._id)}">✕</button>
             <div class="profit-img-card-body">
               ${img.caption ? `<div class="profit-img-caption" title="${escapeHtml(img.caption)}">${escapeHtml(img.caption)}</div>` : ''}
-              <div class="profit-img-date">${new Date(img.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+              <div class="profit-card-footer">
+                <span class="profit-img-date">${new Date(img.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                <button type="button" class="btn btn-sm btn-danger profit-img-delete" data-id="${escapeHtml(img._id)}">Delete</button>
+              </div>
             </div>
           </div>
         `).join('');

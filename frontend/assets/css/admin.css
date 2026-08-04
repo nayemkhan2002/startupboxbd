@@ -476,33 +476,29 @@
   font-family: var(--font-en);
 }
 
-.profit-img-delete {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(231, 76, 60, 0.9);
-  color: #fff;
-  border: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 1rem;
+.profit-card-footer {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  margin-top: 10px;
+  gap: 8px;
 }
 
-.profit-img-card:hover .profit-img-delete {
-  opacity: 1;
+.profit-img-delete {
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: #E74C3C;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease;
 }
 
 .profit-img-delete:hover {
-  background: var(--danger);
-  transform: scale(1.1);
+  background: #C0392B;
+  transform: translateY(-1px);
 }
 
 @media (max-width: 640px) {

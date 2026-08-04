@@ -80,14 +80,6 @@
                 <h3 style="margin-bottom:8px;color:var(--navy);">Investment Summary</h3>
                 <p class="text-muted" style="font-size:0.85rem;margin-bottom:16px;">Review terms, then express interest. No payment is taken on-platform.</p>
 
-                <div class="mb-2">
-                  <div class="progress"><div class="progress-bar" id="p-progress"></div></div>
-                  <div class="progress-meta">
-                    <span id="p-raised-label">Raised</span>
-                    <span id="p-pct">0%</span>
-                  </div>
-                </div>
-
                 <div class="summary-row">
                   <span class="label">Expected ROI</span>
                   <span class="value text-success" id="p-roi">—</span>
@@ -262,12 +254,6 @@
         riskEl.className = `risk-pill ${riskClass(risk)}`;
         riskEl.innerHTML = `<span class="risk-dot"></span>${escapeHtml(risk)}`;
         document.getElementById('risk-copy').textContent = riskCopy[risk] || riskCopy.Medium;
-
-        const pct = progressPct(project.raisedAmount, project.targetAmount);
-        document.getElementById('p-progress').style.width = pct + '%';
-        document.getElementById('p-pct').textContent = pct + '%';
-        document.getElementById('p-raised-label').textContent =
-          `${formatMoney(project.raisedAmount)} raised of ${formatMoney(project.targetAmount)}`;
 
         const banner = document.getElementById('p-banner');
         if (project.thumbnail) {

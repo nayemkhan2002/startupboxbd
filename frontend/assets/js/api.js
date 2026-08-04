@@ -236,13 +236,6 @@ const projectCardHtml = (p, { href, cta = 'View Opportunity' } = {}) => {
         </div>
         <h3 class="project-card-title">${escapeHtml(p.title)}</h3>
         <p class="project-card-desc">${escapeHtml(truncate(p.description, 120))}</p>
-        <div>
-          <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
-          <div class="progress-meta">
-            <span>${formatMoney(p.raisedAmount)} raised</span>
-            <span>${pct}%</span>
-          </div>
-        </div>
         <div class="project-meta-row">
           <span class="meta-chip">Target <strong>${formatMoney(p.targetAmount)}</strong></span>
           <span class="meta-chip">ROI <strong>${escapeHtml(p.expectedROI || 'N/A')}</strong></span>

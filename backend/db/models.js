@@ -115,6 +115,13 @@ const payoutSchema = new mongoose.Schema({
   createdAt: String
 }, opts);
 
+const profitImageSchema = new mongoose.Schema({
+  _id: idField,
+  imageUrl: String,
+  caption: { type: String, default: '' },
+  createdAt: String
+}, opts);
+
 module.exports = {
   generateId,
   User: mongoose.model('User', userSchema),
@@ -122,5 +129,6 @@ module.exports = {
   Interest: mongoose.model('Interest', interestSchema),
   Investment: mongoose.model('Investment', investmentSchema),
   Withdrawal: mongoose.model('Withdrawal', withdrawalSchema),
-  Payout: mongoose.model('Payout', payoutSchema)
+  Payout: mongoose.model('Payout', payoutSchema),
+  ProfitImage: mongoose.model('ProfitImage', profitImageSchema)
 };

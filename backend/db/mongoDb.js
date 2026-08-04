@@ -3,7 +3,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const {
-  generateId, User, Project, Interest, Investment, Withdrawal, Payout
+  generateId, User, Project, Interest, Investment, Withdrawal, Payout, ProfitImage
 } = require('./models');
 
 const stripPassword = (user) => {
@@ -595,6 +595,19 @@ const DB = {
         };
       });
     }
+  },
+
+  profitImages: {
+    find: async () => ProfitImage.find().sort({ createdAt: -1 }).lean(),
+    create: async (data) => {
+      const doc = await ProfitImage.create({
+        imageUrl: data.imageUrl,
+        caption: data.caption || '',
+        createdAt: new Date().toISOString()
+      });
+      return doc.toObject();
+    },
+    findByIdAndDelete: async (id) => ProfitImage.findByIdAndDelete(id).lean()
   }
 };
 

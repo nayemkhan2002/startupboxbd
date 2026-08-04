@@ -699,6 +699,33 @@ const DB = {
         };
       });
     }
+  },
+
+  profitImages: {
+    find: async () => {
+      return readCollection('profitImages')
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+    create: async (data) => {
+      const items = readCollection('profitImages');
+      const newItem = {
+        _id: generateId(),
+        imageUrl: data.imageUrl,
+        caption: data.caption || '',
+        createdAt: new Date().toISOString()
+      };
+      items.push(newItem);
+      writeCollection('profitImages', items);
+      return newItem;
+    },
+    findByIdAndDelete: async (id) => {
+      let items = readCollection('profitImages');
+      const item = items.find(i => i._id === id);
+      if (!item) return null;
+      items = items.filter(i => i._id !== id);
+      writeCollection('profitImages', items);
+      return item;
+    }
   }
 };
 

@@ -1,2 +1,2 @@
 // Entry point for LiteSpeed Passenger / cPanel / Node.js hosts
-require('./backend/server.js');
+module.exports = require('./backend/server.js');

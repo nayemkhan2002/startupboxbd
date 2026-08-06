@@ -162,6 +162,20 @@
         </div>
         <div class="summary-cards" id="preview-summary"></div>
       </div>
+
+      <!-- Audit Log Section -->
+      <div class="audit-log-panel" id="audit-log-panel">
+        <div class="audit-log-header">
+          <div>
+            <h3>📋 Distribution Audit Log</h3>
+            <p class="text-muted" style="font-size:0.84rem;margin-top:4px;">Complete history of all profit distributions you've executed.</p>
+          </div>
+          <span class="audit-count-badge" id="audit-count">0 entries</span>
+        </div>
+        <div class="audit-log-body" id="audit-log-body">
+          <div class="empty-state" style="padding:32px;"><p>Loading audit log…</p></div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -180,10 +194,96 @@
     </div>
   </div>
 
+  <style>
+    .audit-log-panel{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0;box-shadow:var(--shadow-sm);margin-top:24px;overflow:hidden;}
+    .audit-log-header{display:flex;justify-content:space-between;align-items:center;padding:22px 26px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
+    .audit-log-header h3{color:var(--navy);font-size:1.1rem;margin:0;}
+    .audit-count-badge{background:rgba(245,166,35,.12);color:#B8860B;font-weight:700;font-size:0.8rem;padding:5px 14px;border-radius:20px;white-space:nowrap;}
+    .audit-log-body{padding:10px 20px 20px;max-height:560px;overflow-y:auto;}
+    .audit-timeline{position:relative;padding-left:32px;}
+    .audit-timeline::before{content:'';position:absolute;left:11px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,var(--gold),var(--border));border-radius:2px;}
+    .audit-entry{position:relative;padding:16px 0 20px;border-bottom:1px dashed var(--border);}
+    .audit-entry:last-child{border-bottom:none;padding-bottom:8px;}
+    .audit-entry::before{content:'';position:absolute;left:-25px;top:22px;width:12px;height:12px;border-radius:50%;background:var(--gold);border:2.5px solid var(--bg-elevated);box-shadow:0 0 0 2px var(--gold);z-index:1;}
+    .audit-entry-header{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+    .audit-entry-title{font-weight:700;color:var(--navy);font-size:0.95rem;}
+    .audit-entry-time{font-size:0.78rem;color:var(--text-muted);white-space:nowrap;background:var(--bg-subtle);padding:3px 10px;border-radius:12px;}
+    .audit-entry-details{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;margin-top:8px;}
+    .audit-detail-item{font-size:0.84rem;color:var(--text-secondary);}
+    .audit-detail-item .adl{font-weight:600;color:var(--text-muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:2px;}
+    .audit-detail-item .adv{font-weight:700;color:var(--navy);font-family:var(--font-en);}
+    .audit-detail-item .adv.green{color:#10B981;}
+    .audit-detail-item .adv.accent{color:var(--gold);}
+    .audit-admin-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);margin-top:8px;background:var(--bg-subtle);padding:4px 12px;border-radius:16px;}
+    .audit-admin-tag .admin-icon{font-size:0.9rem;}
+  </style>
+
   <script src="/assets/js/api.js"></script>
   <script>
     const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
     let previewData = null;
+
+    // Load and render audit log
+    async function loadAuditLog() {
+      const body = document.getElementById('audit-log-body');
+      const countEl = document.getElementById('audit-count');
+      try {
+        const logs = await apiFetch('/distributions/audit-log');
+        countEl.textContent = `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`;
+
+        if (!logs.length) {
+          body.innerHTML = `<div class="empty-state" style="padding:32px;text-align:center;">
+            <div style="font-size:2rem;margin-bottom:8px;">📋</div>
+            <h3 style="color:var(--navy);font-size:1rem;">No distributions yet</h3>
+            <p class="text-muted" style="font-size:0.88rem;">When you distribute profits, they will appear here as an audit trail.</p>
+          </div>`;
+          return;
+        }
+
+        body.innerHTML = `<div class="audit-timeline">${logs.map(log => {
+          const m = log.metadata || {};
+          const d = new Date(log.createdAt);
+          const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+          const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          const period = m.month && m.year ? `${MONTH_NAMES[m.month]} ${m.year}` : '—';
+
+          return `
+            <div class="audit-entry">
+              <div class="audit-entry-header">
+                <span class="audit-entry-title">${escapeHtml(log.projectTitle || 'Project')}</span>
+                <span class="audit-entry-time">${dateStr} · ${timeStr}</span>
+              </div>
+              <div class="audit-entry-details">
+                <div class="audit-detail-item">
+                  <span class="adl">Period</span>
+                  <span class="adv">${escapeHtml(period)}</span>
+                </div>
+                <div class="audit-detail-item">
+                  <span class="adl">Profit/Share</span>
+                  <span class="adv accent">${formatMoney(m.profitPerShare || 0)}</span>
+                </div>
+                <div class="audit-detail-item">
+                  <span class="adl">Investors</span>
+                  <span class="adv">${m.totalInvestors || 0}</span>
+                </div>
+                <div class="audit-detail-item">
+                  <span class="adl">Total Shares</span>
+                  <span class="adv">${Number(m.totalShares || 0).toLocaleString()}</span>
+                </div>
+                <div class="audit-detail-item">
+                  <span class="adl">Total Distributed</span>
+                  <span class="adv green">${formatMoney(m.totalDistributed || 0)}</span>
+                </div>
+              </div>
+              <div class="audit-admin-tag">
+                <span class="admin-icon">🛡️</span> By ${escapeHtml(log.adminName || 'Admin')}
+              </div>
+            </div>`;
+        }).join('')}</div>`;
+      } catch (err) {
+        body.innerHTML = `<div class="empty-state" style="padding:24px;"><p class="text-muted">${escapeHtml(err.message)}</p></div>`;
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('admin');
@@ -222,6 +322,9 @@
       } catch (err) {
         showToast(err.message, 'error');
       }
+
+      // Load audit log
+      await loadAuditLog();
 
       // Preview button
       document.getElementById('preview-btn').addEventListener('click', async () => {
@@ -357,6 +460,9 @@
           document.getElementById('preview-section').classList.remove('visible');
           document.getElementById('confirm-btn').disabled = true;
           document.getElementById('profitPerShare').value = '';
+
+          // Refresh audit log to show the new entry
+          await loadAuditLog();
         } catch (err) {
           showToast(err.message, 'error');
         } finally {

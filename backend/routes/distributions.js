@@ -142,4 +142,36 @@ router.get('/my/wallet', protect, async (req, res) => {
   }
 });
 
+// Admin: Audit log for profit distributions
+router.get('/audit-log', protect, adminOnly, async (req, res) => {
+  try {
+    const logs = await DB.auditLog.find({ action: 'profit_distribution' });
+
+    // Populate admin name and project title for each log entry
+    const populated = await Promise.all(logs.map(async (log) => {
+      let adminName = 'Admin';
+      let projectTitle = 'Unknown Project';
+      try {
+        if (log.performedBy) {
+          const admin = await DB.users.findById(log.performedBy);
+          if (admin) adminName = admin.name || admin.email || 'Admin';
+        }
+        if (log.metadata?.projectId) {
+          const project = await DB.projects.findById(log.metadata.projectId);
+          if (project) projectTitle = project.title;
+        }
+      } catch (_) { /* ignore lookup errors */ }
+      return {
+        ...log,
+        adminName,
+        projectTitle
+      };
+    }));
+
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

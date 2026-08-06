@@ -3,8 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Must run before requiring ./db — the storage backend is chosen from
-// process.env.MONGO_URI at require time.
+// Load environment variables from both root .env and backend/.env
+dotenv.config({ path: path.join(__dirname, '../.env') });
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const DB = require('./db');
@@ -37,11 +37,16 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Initialize Database & Start Server
+// Start HTTP server immediately to bind port for Passenger health check
+const server = app.listen(PORT, () => {
+  console.log(`Server running smoothly on port ${PORT}`);
+});
+
+// Initialize Database asynchronously
 DB.initDb().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running smoothly on http://localhost:${PORT}`);
-  });
+  console.log('Database initialized successfully');
 }).catch(err => {
   console.error('Failed to initialize database:', err);
 });
+
+module.exports = app;

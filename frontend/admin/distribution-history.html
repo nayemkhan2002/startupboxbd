@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Distribution History — Admin</title>
+  <meta name="description" content="View all profit distributions with filtering and audit trail">
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .filter-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:22px;box-shadow:var(--shadow-sm);}
+    .filter-bar .form-group{flex:1;min-width:150px;}
+    .filter-bar .form-group label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:5px;}
+    .filter-bar .form-group select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.88rem;background:#fff;color:var(--text);}
+    .filter-bar .form-group select:focus{outline:none;border-color:var(--gold);}
+    .filter-bar .btn-filter{padding:10px 20px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.88rem;transition:all .2s;}
+    .filter-bar .btn-filter:hover{background:var(--gold);color:var(--navy);}
+    .dist-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px;}
+    .dist-stat-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm);}
+    .dist-stat-card .ds-label{font-size:0.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+    .dist-stat-card .ds-value{font-size:1.5rem;font-weight:800;color:var(--navy);margin-top:4px;font-family:var(--font-en);}
+    .dist-stat-card .ds-value.gold{color:var(--gold);}
+    .dist-stat-card .ds-value.green{color:#10B981;}
+    .dist-table-wrap{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden;}
+    .detail-modal{display:none;position:fixed;inset:0;background:rgba(10,15,44,.55);z-index:2000;backdrop-filter:blur(4px);padding:24px;overflow-y:auto;}
+    .detail-modal.open{display:flex;align-items:flex-start;justify-content:center;padding-top:60px;}
+    .detail-box{background:#fff;border-radius:var(--radius-lg);padding:28px 32px;max-width:720px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border);}
+    .detail-box h3{color:var(--navy);font-size:1.15rem;margin-bottom:16px;}
+    .detail-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-bottom:18px;}
+    .detail-info-grid .di-item{font-size:0.88rem;}
+    .detail-info-grid .di-item .di-label{color:var(--text-muted);font-size:0.78rem;font-weight:600;text-transform:uppercase;}
+    .detail-info-grid .di-item .di-val{color:var(--navy);font-weight:700;margin-top:2px;}
+    .detail-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-muted);transition:color .2s;}
+    .detail-close:hover{color:var(--navy);}
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-profit.html"><span class="nav-icon">📊</span> Assign Profit</a>
+          <a href="/admin/distribution-history.html" class="active"><span class="nav-icon">📋</span> Distribution History</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Distribution History</h2>
+            <p>View all past profit distributions with complete audit trail.</p>
+          </div>
+        </div>
+        <a href="/admin/assign-profit.html" class="btn btn-primary btn-sm">+ New Distribution</a>
+      </div>
+
+      <!-- Stats -->
+      <div class="dist-stats" id="dist-stats">
+        <div class="dist-stat-card"><div class="ds-label">Total Distributions</div><div class="ds-value" id="stat-total">—</div></div>
+        <div class="dist-stat-card"><div class="ds-label">Total Distributed</div><div class="ds-value gold" id="stat-amount">—</div></div>
+        <div class="dist-stat-card"><div class="ds-label">Unique Projects</div><div class="ds-value" id="stat-projects">—</div></div>
+        <div class="dist-stat-card"><div class="ds-label">Total Investors Paid</div><div class="ds-value green" id="stat-investors">—</div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="filter-bar" id="filter-bar">
+        <div class="form-group">
+          <label for="filterProject">Project</label>
+          <select id="filterProject"><option value="">All Projects</option></select>
+        </div>
+        <div class="form-group">
+          <label for="filterMonth">Month</label>
+          <select id="filterMonth">
+            <option value="">All Months</option>
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filterYear">Year</label>
+          <select id="filterYear"><option value="">All Years</option></select>
+        </div>
+        <button type="button" class="btn-filter" id="filter-btn">Filter</button>
+      </div>
+
+      <!-- Table -->
+      <div class="dist-table-wrap">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Project</th>
+                <th>Period</th>
+                <th>Profit/Share</th>
+                <th>Investors</th>
+                <th>Total Shares</th>
+                <th>Total Distributed</th>
+                <th>By</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dist-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Detail Modal -->
+  <div class="detail-modal" id="detail-modal">
+    <div class="detail-box" style="position:relative;">
+      <button type="button" class="detail-close" id="detail-close">&times;</button>
+      <h3 id="detail-title">Distribution Detail</h3>
+      <div class="detail-info-grid" id="detail-info"></div>
+      <h4 style="color:var(--navy);font-size:0.95rem;margin-bottom:10px;">Investor Breakdown</h4>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>#</th><th>Investor</th><th>Email</th><th>Shares</th><th>Profit/Share</th><th>Total Profit</th></tr>
+          </thead>
+          <tbody id="detail-ledger"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      // Populate years
+      const yearSelect = document.getElementById('filterYear');
+      const currentYear = new Date().getFullYear();
+      for (let y = currentYear + 1; y >= 2024; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        yearSelect.appendChild(opt);
+      }
+
+      // Load projects for filter
+      try {
+        const projects = await apiFetch('/projects');
+        const sel = document.getElementById('filterProject');
+        projects.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p._id;
+          opt.textContent = p.title;
+          sel.appendChild(opt);
+        });
+      } catch (e) {}
+
+      // Load distributions
+      loadDistributions();
+
+      document.getElementById('filter-btn').addEventListener('click', loadDistributions);
+
+      // Detail modal close
+      document.getElementById('detail-close').addEventListener('click', () => {
+        document.getElementById('detail-modal').classList.remove('open');
+      });
+      document.getElementById('detail-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('detail-modal')) {
+          document.getElementById('detail-modal').classList.remove('open');
+        }
+      });
+    });
+
+    async function loadDistributions() {
+      const tbody = document.getElementById('dist-table');
+      const params = new URLSearchParams();
+      const pv = document.getElementById('filterProject').value;
+      const mv = document.getElementById('filterMonth').value;
+      const yv = document.getElementById('filterYear').value;
+      if (pv) params.set('projectId', pv);
+      if (mv) params.set('month', mv);
+      if (yv) params.set('year', yv);
+
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><p>Loading…</p></div></td></tr>`;
+
+      try {
+        const list = await apiFetch(`/distributions?${params.toString()}`);
+
+        // Stats
+        document.getElementById('stat-total').textContent = list.length;
+        document.getElementById('stat-amount').textContent = formatMoney(list.reduce((s, d) => s + (Number(d.totalDistributed) || 0), 0));
+        document.getElementById('stat-projects').textContent = new Set(list.map(d => d.projectId)).size;
+        document.getElementById('stat-investors').textContent = list.reduce((s, d) => s + (Number(d.totalInvestors) || 0), 0);
+
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><h3>No distributions found</h3><p>No profit distributions match the selected filters.</p></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = list.map((d, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><strong>${escapeHtml(d.project?.title || 'N/A')}</strong></td>
+            <td>${MONTH_NAMES[d.month] || '?'} ${d.year}</td>
+            <td>${formatMoney(d.profitPerShare)}</td>
+            <td>${d.totalInvestors}</td>
+            <td>${Number(d.totalShares).toLocaleString()}</td>
+            <td class="text-success"><strong>${formatMoney(d.totalDistributed)}</strong></td>
+            <td>${escapeHtml(d.admin?.name || '—')}</td>
+            <td><small>${new Date(d.createdAt).toLocaleDateString()}</small></td>
+            <td><button class="btn btn-outline btn-sm" onclick="viewDetail('${d._id}')">View</button></td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    }
+
+    async function viewDetail(id) {
+      try {
+        const [dist, ledger] = await Promise.all([
+          apiFetch(`/distributions/detail/${id}`),
+          apiFetch(`/distributions/detail/${id}/ledger`)
+        ]);
+
+        document.getElementById('detail-title').textContent =
+          `Distribution: ${dist.project?.title || 'Project'} — ${MONTH_NAMES[dist.month]} ${dist.year}`;
+
+        document.getElementById('detail-info').innerHTML = `
+          <div class="di-item"><div class="di-label">Project</div><div class="di-val">${escapeHtml(dist.project?.title || 'N/A')}</div></div>
+          <div class="di-item"><div class="di-label">Period</div><div class="di-val">${MONTH_NAMES[dist.month]} ${dist.year}</div></div>
+          <div class="di-item"><div class="di-label">Profit Per Share</div><div class="di-val">${formatMoney(dist.profitPerShare)}</div></div>
+          <div class="di-item"><div class="di-label">Total Distributed</div><div class="di-val" style="color:#10B981;">${formatMoney(dist.totalDistributed)}</div></div>
+          <div class="di-item"><div class="di-label">Created By</div><div class="di-val">${escapeHtml(dist.admin?.name || '—')}</div></div>
+          <div class="di-item"><div class="di-label">Date</div><div class="di-val">${new Date(dist.createdAt).toLocaleString()}</div></div>
+        `;
+
+        const ledgerTbody = document.getElementById('detail-ledger');
+        ledgerTbody.innerHTML = ledger.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><strong>${escapeHtml(e.investor?.name || 'Unknown')}</strong></td>
+            <td>${escapeHtml(e.investor?.email || '')}</td>
+            <td>${Number(e.shares).toLocaleString()}</td>
+            <td>${formatMoney(e.profitPerShare)}</td>
+            <td class="text-success"><strong>${formatMoney(e.calculatedProfit)}</strong></td>
+          </tr>
+        `).join('');
+
+        document.getElementById('detail-modal').classList.add('open');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -122,6 +122,56 @@ const profitImageSchema = new mongoose.Schema({
   createdAt: String
 }, opts);
 
+const profitDistributionSchema = new mongoose.Schema({
+  _id: idField,
+  projectId: { type: String, required: true, index: true },
+  profitPerShare: { type: Number, required: true },
+  month: { type: Number, required: true },
+  year: { type: Number, required: true },
+  totalShares: { type: Number, default: 0 },
+  totalInvestors: { type: Number, default: 0 },
+  totalDistributed: { type: Number, default: 0 },
+  status: { type: String, default: 'completed' },
+  createdBy: { type: String, index: true },
+  createdAt: String
+}, opts);
+
+// Duplicate protection: only one distribution per project per month per year
+profitDistributionSchema.index({ projectId: 1, month: 1, year: 1 }, { unique: true });
+
+const investorProfitLedgerSchema = new mongoose.Schema({
+  _id: idField,
+  distributionId: { type: String, required: true, index: true },
+  investorId: { type: String, required: true, index: true },
+  projectId: { type: String, required: true, index: true },
+  investmentId: { type: String, index: true },
+  shares: { type: Number, required: true },
+  profitPerShare: { type: Number, required: true },
+  calculatedProfit: { type: Number, required: true },
+  month: { type: Number },
+  year: { type: Number },
+  createdAt: String
+}, opts);
+
+const auditLogSchema = new mongoose.Schema({
+  _id: idField,
+  action: { type: String, required: true, index: true },
+  performedBy: { type: String, index: true },
+  targetUserId: String,
+  metadata: { type: Object, default: {} },
+  createdAt: String
+}, opts);
+
+const walletSchema = new mongoose.Schema({
+  _id: idField,
+  investorId: { type: String, required: true, unique: true, index: true },
+  availableBalance: { type: Number, default: 0 },
+  pendingBalance: { type: Number, default: 0 },
+  withdrawnBalance: { type: Number, default: 0 },
+  updatedAt: String,
+  createdAt: String
+}, opts);
+
 module.exports = {
   generateId,
   User: mongoose.model('User', userSchema),
@@ -130,5 +180,9 @@ module.exports = {
   Investment: mongoose.model('Investment', investmentSchema),
   Withdrawal: mongoose.model('Withdrawal', withdrawalSchema),
   Payout: mongoose.model('Payout', payoutSchema),
-  ProfitImage: mongoose.model('ProfitImage', profitImageSchema)
+  ProfitImage: mongoose.model('ProfitImage', profitImageSchema),
+  ProfitDistribution: mongoose.model('ProfitDistribution', profitDistributionSchema),
+  InvestorProfitLedger: mongoose.model('InvestorProfitLedger', investorProfitLedgerSchema),
+  AuditLog: mongoose.model('AuditLog', auditLogSchema),
+  Wallet: mongoose.model('Wallet', walletSchema)
 };

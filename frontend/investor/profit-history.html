@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profit History — Investor Portal</title>
+  <meta name="description" content="View your monthly profit distributions, wallet balance, and per-project share earnings.">
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/investor.css">
+  <style>
+    .wallet-hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px;}
+    .wallet-card{background:linear-gradient(135deg,var(--navy),#1e293b);color:#fff;border-radius:var(--radius);padding:22px;border:1px solid rgba(255,255,255,0.08);box-shadow:var(--shadow-md);position:relative;overflow:hidden;}
+    .wallet-card::after{content:'';position:absolute;top:-40%;right:-30%;width:180px;height:180px;background:radial-gradient(circle,rgba(245,166,35,0.15) 0%,transparent 70%);border-radius:50%;pointer-events:none;}
+    .wallet-card.accent-card{background:linear-gradient(135deg,#0f172a,#1e1b4b);}
+    .wallet-card .wc-label{font-size:0.8rem;color:rgba(255,255,255,0.65);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;}
+    .wallet-card .wc-val{font-size:1.65rem;font-weight:800;color:var(--gold);margin-top:6px;font-family:var(--font-en);}
+    .wallet-card .wc-sub{font-size:0.78rem;color:rgba(255,255,255,0.5);margin-top:4px;}
+    .wallet-card.green-card .wc-val{color:#34D399;}
+    .wallet-card.blue-card .wc-val{color:#60A5FA;}
+    .project-breakdown-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:24px;}
+    .pb-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:18px;box-shadow:var(--shadow-sm);}
+    .pb-card h4{font-size:0.95rem;color:var(--navy);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .pb-card .pb-stats{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px dashed var(--border);}
+    .pb-card .pb-stat-item{text-align:left;}
+    .pb-card .pb-stat-item .lbl{font-size:0.75rem;color:var(--text-muted);font-weight:600;}
+    .pb-card .pb-stat-item .val{font-size:1rem;font-weight:800;color:var(--navy);font-family:var(--font-en);}
+    .pb-card .pb-stat-item .val.green{color:#10B981;}
+    .chart-container{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
+    .chart-container h3{font-size:1.05rem;color:var(--navy);margin-bottom:18px;}
+    .monthly-bars{display:flex;align-items:flex-end;gap:12px;height:160px;padding-top:20px;overflow-x:auto;}
+    .bar-col{flex:1;min-width:44px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;}
+    .bar-col .bar-val{font-size:0.7rem;font-weight:700;color:var(--navy);margin-bottom:4px;font-family:var(--font-en);}
+    .bar-col .bar-fill-ver{width:100%;max-width:28px;background:linear-gradient(180deg,var(--gold),#E8950F);border-radius:6px 6px 0 0;min-height:4px;transition:height 0.6s ease;}
+    .bar-col .bar-lbl{font-size:0.72rem;color:var(--text-muted);margin-top:6px;font-weight:600;white-space:nowrap;}
+  </style>
+</head>
+<body>
+  <div class="investor-wrapper">
+    <aside class="investor-sidebar">
+      <div>
+        <a href="/investor/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Investor Portal">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">INVESTOR PORTAL</span>
+          </span>
+        </a>
+        <nav class="investor-nav" id="sidebar-nav"></nav>
+      </div>
+      <div class="investor-sidebar-footer">
+        <div class="investor-user-info">
+          <div class="investor-user-avatar" id="inv-avatar">I</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="inv-name">Investor</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="inv-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="investor-main-content">
+      <div class="investor-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Profit Distribution History</h2>
+            <p>Track earnings distributed from your project share holdings.</p>
+          </div>
+        </div>
+        <a href="/investor/withdrawals.html" class="btn btn-primary btn-sm">Request Withdrawal</a>
+      </div>
+
+      <!-- Wallet Summary Hero Cards -->
+      <div class="wallet-hero">
+        <div class="wallet-card accent-card">
+          <div class="wc-label">Total Profit Earned</div>
+          <div class="wc-val" id="w-total-earned">৳0</div>
+          <div class="wc-sub">All-time share profit distributions</div>
+        </div>
+        <div class="wallet-card green-card">
+          <div class="wc-label">Available Balance</div>
+          <div class="wc-val" id="w-available">৳0</div>
+          <div class="wc-sub">Ready for withdrawal request</div>
+        </div>
+        <div class="wallet-card blue-card">
+          <div class="wc-label">Pending / Reserved</div>
+          <div class="wc-val" id="w-pending">৳0</div>
+          <div class="wc-sub">Under withdrawal processing</div>
+        </div>
+        <div class="wallet-card">
+          <div class="wc-label">Total Withdrawn</div>
+          <div class="wc-val" id="w-withdrawn">৳0</div>
+          <div class="wc-sub">Paid out to bank/bKash</div>
+        </div>
+      </div>
+
+      <!-- Monthly Earnings Chart -->
+      <div class="chart-container" id="chart-card" style="display:none;">
+        <h3>📊 Monthly Profit Trend</h3>
+        <div class="monthly-bars" id="monthly-bars"></div>
+      </div>
+
+      <!-- Project Profit Breakdown -->
+      <div style="margin-bottom:24px;">
+        <h3 style="font-size:1.05rem;color:var(--navy);margin-bottom:14px;">Earnings by Project</h3>
+        <div class="project-breakdown-grid" id="project-breakdown">
+          <div class="empty-state"><p>Loading project stats…</p></div>
+        </div>
+      </div>
+
+      <!-- Profit Ledger Table -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3 class="panel-title">Profit Ledger Log</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Period</th>
+                <th>Project</th>
+                <th>Shares</th>
+                <th>Profit/Share</th>
+                <th>Calculated Profit</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="ledger-table">
+              <tr><td colspan="7"><div class="empty-state"><p>Loading history…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="bottom-nav-wrap"></div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script>
+    const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('investor');
+      if (!user) return;
+
+      document.getElementById('sidebar-nav').innerHTML = investorNav('profit-history');
+      document.getElementById('bottom-nav-wrap').innerHTML = investorBottomNav('profit-history');
+
+      document.getElementById('inv-name').textContent = user.name || 'Investor';
+      document.getElementById('inv-email').textContent = user.email || '';
+      document.getElementById('inv-avatar').textContent = (user.name || 'I').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.investor-sidebar');
+
+      loadData();
+    });
+
+    async function loadData() {
+      try {
+        const [summary, ledger] = await Promise.all([
+          apiFetch('/distributions/my/summary'),
+          apiFetch('/distributions/my')
+        ]);
+
+        // Wallet Hero
+        document.getElementById('w-total-earned').textContent = formatMoney(summary.totalEarned);
+        document.getElementById('w-available').textContent = formatMoney(summary.wallet?.availableBalance || 0);
+        document.getElementById('w-pending').textContent = formatMoney(summary.wallet?.pendingBalance || 0);
+        document.getElementById('w-withdrawn').textContent = formatMoney(summary.wallet?.withdrawnBalance || 0);
+
+        // Project Breakdown Cards
+        const pbGrid = document.getElementById('project-breakdown');
+        if (!summary.perProject || !summary.perProject.length) {
+          pbGrid.innerHTML = `<div class="empty-state"><p>No profit assigned to any project shares yet.</p></div>`;
+        } else {
+          pbGrid.innerHTML = summary.perProject.map(p => `
+            <div class="pb-card">
+              <h4>${escapeHtml(p.projectTitle || 'Project')}</h4>
+              <span class="text-muted" style="font-size:0.75rem;">${escapeHtml(p.projectCategory || 'General')}</span>
+              <div class="pb-stats">
+                <div class="pb-stat-item"><div class="lbl">Shares</div><div class="val">${Number(p.totalShares).toLocaleString()}</div></div>
+                <div class="pb-stat-item"><div class="lbl">Distributions</div><div class="val">${p.distributions}</div></div>
+                <div class="pb-stat-item"><div class="lbl">Total Earned</div><div class="val green">${formatMoney(p.totalProfit)}</div></div>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        // Monthly Bars Chart
+        if (summary.monthly && summary.monthly.length > 0) {
+          const maxAmt = Math.max(...summary.monthly.map(m => m.amount), 1);
+          const barsEl = document.getElementById('monthly-bars');
+          barsEl.innerHTML = summary.monthly.slice(0, 12).reverse().map(m => {
+            const pct = Math.round((m.amount / maxAmt) * 100);
+            return `
+              <div class="bar-col">
+                <div class="bar-val">${formatMoney(m.amount)}</div>
+                <div class="bar-fill-ver" style="height:${Math.max(pct, 6)}%;"></div>
+                <div class="bar-lbl">${MONTH_NAMES[m.month]} ${String(m.year).slice(-2)}</div>
+              </div>
+            `;
+          }).join('');
+          document.getElementById('chart-card').style.display = 'block';
+        }
+
+        // Ledger Table
+        const tbody = document.getElementById('ledger-table');
+        if (!ledger || !ledger.length) {
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No profits distributed yet</h3><p>When the admin assigns profits to your project shares, they will appear here.</p></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = ledger.map((e, i) => `
+          <tr>
+            <td>${i + 1}</td>
+            <td><strong>${MONTH_NAMES[e.month] || e.month} ${e.year}</strong></td>
+            <td>${escapeHtml(e.project?.title || 'N/A')}</td>
+            <td>${Number(e.shares).toLocaleString()}</td>
+            <td>${formatMoney(e.profitPerShare)}</td>
+            <td class="text-success"><strong>${formatMoney(e.calculatedProfit)}</strong></td>
+            <td><small class="text-muted">${new Date(e.createdAt).toLocaleDateString()}</small></td>
+          </tr>
+        `).join('');
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>

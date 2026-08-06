@@ -4,6 +4,7 @@ const investorNav = (active) => {
   const items = [
     { href: '/investor/dashboard.html', key: 'dashboard', icon: '▣', label: 'Dashboard' },
     { href: '/investor/investments.html', key: 'investments', icon: '◈', label: 'My Investments' },
+    { href: '/investor/profit-history.html', key: 'profit-history', icon: '📊', label: 'Profit History' },
     { href: '/investor/payouts.html', key: 'payouts', icon: '💰', label: 'Profit Payouts' },
     { href: '/investor/withdrawals.html', key: 'withdrawals', icon: '⇄', label: 'Withdrawal Requests' },
     { href: '/investor/profile.html', key: 'profile', icon: '◉', label: 'Profile' },

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assign Profit — Admin</title>
+  <meta name="description" content="Distribute project profits to investors based on share ownership">
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .dist-form-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-sm);margin-bottom:24px;}
+    .dist-form-card h3{color:var(--navy);font-size:1.15rem;margin-bottom:18px;}
+    .dist-form-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+    .dist-form-row .form-group{flex:1;min-width:180px;}
+    .dist-form-row .form-group label{display:block;font-size:0.82rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px;}
+    .dist-form-row .form-group select,.dist-form-row .form-group input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.92rem;background:#fff;color:var(--text);}
+    .dist-form-row .form-group select:focus,.dist-form-row .form-group input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft);}
+    .dist-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+    .btn-preview{background:linear-gradient(135deg,#3B82F6,#2563EB);color:#fff;border:none;padding:11px 24px;border-radius:10px;font-weight:700;font-size:0.92rem;cursor:pointer;transition:all .2s;}
+    .btn-preview:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(37,99,235,.35);}
+    .btn-confirm{background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;padding:11px 24px;border-radius:10px;font-weight:700;font-size:0.92rem;cursor:pointer;transition:all .2s;}
+    .btn-confirm:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(5,150,105,.35);}
+    .btn-confirm:disabled,.btn-preview:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none;}
+    .preview-section{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:24px;display:none;}
+    .preview-section.visible{display:block;animation:fadeSlide .35s ease;}
+    @keyframes fadeSlide{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+    .preview-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+    .preview-header h3{color:var(--navy);font-size:1.1rem;}
+    .preview-badge{background:rgba(59,130,246,.1);color:#2563EB;font-weight:700;padding:5px 14px;border-radius:20px;font-size:0.82rem;}
+    .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-top:20px;}
+    .summary-card{background:linear-gradient(135deg,var(--bg-subtle),#f8fafc);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;}
+    .summary-card .sc-label{font-size:0.78rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+    .summary-card .sc-value{font-size:1.4rem;font-weight:800;color:var(--navy);margin-top:4px;font-family:var(--font-en);}
+    .summary-card .sc-value.accent{color:var(--gold);}
+    .summary-card .sc-value.success{color:#10B981;}
+    .confirm-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,44,.55);z-index:2000;backdrop-filter:blur(4px);padding:24px;overflow-y:auto;}
+    .confirm-overlay.open{display:flex;align-items:center;justify-content:center;}
+    .confirm-box{background:#fff;border-radius:var(--radius-lg);padding:32px;max-width:480px;width:100%;box-shadow:var(--shadow-lg);border:1px solid var(--border);}
+    .confirm-box h3{color:var(--navy);font-size:1.2rem;margin-bottom:12px;}
+    .confirm-box p{color:var(--text-secondary);font-size:0.92rem;line-height:1.6;margin-bottom:20px;}
+    .confirm-box .confirm-detail{background:var(--bg-subtle);border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:0.88rem;line-height:1.7;}
+    .confirm-box .confirm-detail strong{color:var(--navy);}
+    .confirm-btns{display:flex;gap:12px;justify-content:flex-end;}
+    .loading-spinner{display:inline-block;width:18px;height:18px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-profit.html" class="active"><span class="nav-icon">📊</span> Assign Profit</a>
+          <a href="/admin/distribution-history.html"><span class="nav-icon">📋</span> Distribution History</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Assign Profit</h2>
+            <p>Distribute project profits to investors based on their share ownership.</p>
+          </div>
+        </div>
+        <a href="/admin/distribution-history.html" class="btn btn-outline btn-sm">View History</a>
+      </div>
+
+      <!-- Distribution Form -->
+      <div class="dist-form-card" id="dist-form-card">
+        <h3>📊 New Profit Distribution</h3>
+        <div class="dist-form-row">
+          <div class="form-group">
+            <label for="projectId">Select Project</label>
+            <select id="projectId" required>
+              <option value="">— Choose a project —</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="profitPerShare">Profit Per Share (৳)</label>
+            <input type="number" id="profitPerShare" min="1" step="any" placeholder="e.g. 500" required>
+          </div>
+        </div>
+        <div class="dist-form-row">
+          <div class="form-group">
+            <label for="distMonth">Distribution Month</label>
+            <select id="distMonth" required>
+              <option value="">— Select month —</option>
+              <option value="1">January</option>
+              <option value="2">February</option>
+              <option value="3">March</option>
+              <option value="4">April</option>
+              <option value="5">May</option>
+              <option value="6">June</option>
+              <option value="7">July</option>
+              <option value="8">August</option>
+              <option value="9">September</option>
+              <option value="10">October</option>
+              <option value="11">November</option>
+              <option value="12">December</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="distYear">Distribution Year</label>
+            <select id="distYear" required></select>
+          </div>
+        </div>
+        <div class="dist-actions">
+          <button type="button" class="btn-preview" id="preview-btn">Preview Distribution</button>
+          <button type="button" class="btn-confirm" id="confirm-btn" disabled>Confirm Distribution</button>
+        </div>
+      </div>
+
+      <!-- Preview Section -->
+      <div class="preview-section" id="preview-section">
+        <div class="preview-header">
+          <h3>Distribution Preview</h3>
+          <span class="preview-badge" id="preview-project-badge">—</span>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Investor Name</th>
+                <th>Email</th>
+                <th>Total Shares</th>
+                <th>Profit Per Share</th>
+                <th>Calculated Profit</th>
+              </tr>
+            </thead>
+            <tbody id="preview-table"></tbody>
+          </table>
+        </div>
+        <div class="summary-cards" id="preview-summary"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <h3>⚡ Confirm Profit Distribution</h3>
+      <p>You are about to distribute profits to all investors in this project. This action cannot be undone.</p>
+      <div class="confirm-detail" id="confirm-detail"></div>
+      <div class="confirm-btns">
+        <button type="button" class="btn btn-outline" id="confirm-cancel">Cancel</button>
+        <button type="button" class="btn-confirm" id="confirm-execute">
+          Confirm &amp; Distribute
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
+    let previewData = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      // Populate year dropdown
+      const yearSelect = document.getElementById('distYear');
+      const currentYear = new Date().getFullYear();
+      for (let y = currentYear + 1; y >= 2024; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === currentYear) opt.selected = true;
+        yearSelect.appendChild(opt);
+      }
+
+      // Set current month
+      document.getElementById('distMonth').value = new Date().getMonth() + 1;
+
+      // Load projects
+      try {
+        const projects = await apiFetch('/projects');
+        const projectSelect = document.getElementById('projectId');
+        projects.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p._id;
+          opt.textContent = `${p.title} (${p.category || 'General'})`;
+          projectSelect.appendChild(opt);
+        });
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+
+      // Preview button
+      document.getElementById('preview-btn').addEventListener('click', async () => {
+        const projectId = document.getElementById('projectId').value;
+        const profitPerShare = Number(document.getElementById('profitPerShare').value);
+        const month = document.getElementById('distMonth').value;
+        const year = document.getElementById('distYear').value;
+
+        if (!projectId) return showToast('Please select a project', 'error');
+        if (!profitPerShare || profitPerShare <= 0) return showToast('Profit per share must be greater than zero', 'error');
+        if (!month) return showToast('Please select a month', 'error');
+        if (!year) return showToast('Please select a year', 'error');
+
+        const btn = document.getElementById('preview-btn');
+        btn.disabled = true;
+        btn.textContent = 'Loading…';
+
+        try {
+          previewData = await apiFetch('/distributions/preview', {
+            method: 'POST',
+            body: JSON.stringify({ projectId, profitPerShare })
+          });
+
+          const previewSection = document.getElementById('preview-section');
+          const tbody = document.getElementById('preview-table');
+          const summaryEl = document.getElementById('preview-summary');
+
+          if (!previewData.investors || !previewData.investors.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No investors found</h3><p>No investors have shares in this project.</p></div></td></tr>`;
+            summaryEl.innerHTML = '';
+            previewSection.classList.add('visible');
+            document.getElementById('confirm-btn').disabled = true;
+            return;
+          }
+
+          document.getElementById('preview-project-badge').textContent =
+            `${previewData.project?.title || 'Project'} — ${MONTH_NAMES[Number(month)]} ${year}`;
+
+          tbody.innerHTML = previewData.investors.map((inv, i) => `
+            <tr>
+              <td>${i + 1}</td>
+              <td><strong>${escapeHtml(inv.investorName)}</strong></td>
+              <td><span class="text-muted">${escapeHtml(inv.investorEmail)}</span></td>
+              <td><strong>${Number(inv.totalShares).toLocaleString()}</strong></td>
+              <td>${formatMoney(inv.profitPerShare)}</td>
+              <td class="text-success"><strong>${formatMoney(inv.calculatedProfit)}</strong></td>
+            </tr>
+          `).join('');
+
+          summaryEl.innerHTML = `
+            <div class="summary-card">
+              <div class="sc-label">Total Investors</div>
+              <div class="sc-value accent">${previewData.totalInvestors}</div>
+            </div>
+            <div class="summary-card">
+              <div class="sc-label">Total Shares</div>
+              <div class="sc-value">${Number(previewData.totalShares).toLocaleString()}</div>
+            </div>
+            <div class="summary-card">
+              <div class="sc-label">Profit Per Share</div>
+              <div class="sc-value">${formatMoney(profitPerShare)}</div>
+            </div>
+            <div class="summary-card">
+              <div class="sc-label">Grand Total</div>
+              <div class="sc-value success">${formatMoney(previewData.grandTotal)}</div>
+            </div>
+          `;
+
+          previewSection.classList.add('visible');
+          document.getElementById('confirm-btn').disabled = false;
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Preview Distribution';
+        }
+      });
+
+      // Confirm button → open modal
+      document.getElementById('confirm-btn').addEventListener('click', () => {
+        if (!previewData || !previewData.investors?.length) return;
+
+        const month = document.getElementById('distMonth').value;
+        const year = document.getElementById('distYear').value;
+        const profitPerShare = document.getElementById('profitPerShare').value;
+        const projectSelect = document.getElementById('projectId');
+        const projectName = projectSelect.options[projectSelect.selectedIndex]?.textContent || 'Project';
+
+        document.getElementById('confirm-detail').innerHTML = `
+          <strong>Project:</strong> ${escapeHtml(projectName)}<br>
+          <strong>Period:</strong> ${MONTH_NAMES[Number(month)]} ${year}<br>
+          <strong>Profit Per Share:</strong> ${formatMoney(profitPerShare)}<br>
+          <strong>Total Investors:</strong> ${previewData.totalInvestors}<br>
+          <strong>Total Shares:</strong> ${Number(previewData.totalShares).toLocaleString()}<br>
+          <strong>Grand Total:</strong> <span style="color:#10B981;font-weight:800;">${formatMoney(previewData.grandTotal)}</span>
+        `;
+
+        document.getElementById('confirm-overlay').classList.add('open');
+      });
+
+      // Cancel modal
+      document.getElementById('confirm-cancel').addEventListener('click', () => {
+        document.getElementById('confirm-overlay').classList.remove('open');
+      });
+      document.getElementById('confirm-overlay').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('confirm-overlay')) {
+          document.getElementById('confirm-overlay').classList.remove('open');
+        }
+      });
+
+      // Execute distribution
+      document.getElementById('confirm-execute').addEventListener('click', async () => {
+        const btn = document.getElementById('confirm-execute');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Processing…';
+
+        try {
+          const result = await apiFetch('/distributions/confirm', {
+            method: 'POST',
+            body: JSON.stringify({
+              projectId: document.getElementById('projectId').value,
+              profitPerShare: Number(document.getElementById('profitPerShare').value),
+              month: Number(document.getElementById('distMonth').value),
+              year: Number(document.getElementById('distYear').value)
+            })
+          });
+
+          document.getElementById('confirm-overlay').classList.remove('open');
+          showToast(`✅ Profit distributed successfully! ${formatMoney(result.totalDistributed)} to ${result.totalInvestors} investors.`, 'success');
+
+          // Reset form
+          previewData = null;
+          document.getElementById('preview-section').classList.remove('visible');
+          document.getElementById('confirm-btn').disabled = true;
+          document.getElementById('profitPerShare').value = '';
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = 'Confirm &amp; Distribute';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

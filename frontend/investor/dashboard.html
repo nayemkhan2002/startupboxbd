@@ -62,6 +62,36 @@
           </div>
         </div>
 
+        <!-- Wallet & Profit Distributions Panel -->
+        <div class="panel mb-3" style="background:linear-gradient(135deg,var(--bg-elevated),#f8fafc);border:1px solid var(--border);">
+          <div class="panel-header flex-between flex-wrap gap-2">
+            <div>
+              <h2 style="font-size:1.15rem;color:var(--navy);">📊 Share Profit Distributions</h2>
+              <p class="text-muted" style="font-size:0.85rem;">Monthly earnings credited to your wallet balance based on your shares</p>
+            </div>
+            <div class="flex gap-2">
+              <a href="/investor/profit-history.html" class="btn btn-outline btn-sm">Full History &amp; Breakdown</a>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Project</th>
+                  <th>Shares</th>
+                  <th>Profit/Share</th>
+                  <th>Amount Earned</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="dash-profit-table">
+                <tr><td colspan="6"><div class="empty-state" style="padding:16px;"><p>Loading profit history…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="flex-between mb-2" style="flex-wrap:wrap;gap:12px;">
           <div>
             <h2 style="font-size:1.2rem;color:var(--navy);">Recent Investments</h2>
@@ -120,11 +150,12 @@
       const interestsEl = document.getElementById('interests-container');
 
       try {
-        const [stats, investments, interests, profile] = await Promise.all([
+        const [stats, investments, interests, profile, profitLedger] = await Promise.all([
           apiFetch('/investments/stats'),
           apiFetch('/investments/my'),
           apiFetch('/interest/my'),
-          apiFetch('/profile/me')
+          apiFetch('/profile/me'),
+          apiFetch('/distributions/my')
         ]);
 
         syncLocalUser(profile);
@@ -135,6 +166,24 @@
         document.getElementById('kpi-active').textContent = stats.activeInvestments;
         document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
         document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
+
+        // Render recent profit distributions
+        const dashProfitTable = document.getElementById('dash-profit-table');
+        if (!profitLedger || !profitLedger.length) {
+          dashProfitTable.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:18px;"><p>No profit distributions received yet.</p></div></td></tr>`;
+        } else {
+          const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          dashProfitTable.innerHTML = profitLedger.slice(0, 5).map(e => `
+            <tr>
+              <td><strong>${MONTHS[e.month] || e.month} ${e.year}</strong></td>
+              <td>${escapeHtml(e.project?.title || 'N/A')}</td>
+              <td>${Number(e.shares).toLocaleString()}</td>
+              <td>${formatMoney(e.profitPerShare)}</td>
+              <td class="text-success"><strong>${formatMoney(e.calculatedProfit)}</strong></td>
+              <td><small class="text-muted">${new Date(e.createdAt).toLocaleDateString()}</small></td>
+            </tr>
+          `).join('');
+        }
 
         const recent = investments.slice(0, 4);
         if (!recent.length) {

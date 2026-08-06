@@ -140,10 +140,14 @@ const initDb = async () => {
     writeCollection('users', users);
   }
 
-  // Ensure investment / withdrawal / payout collections exist
+  // Ensure investment / withdrawal / payout / distribution collections exist
   readCollection('investments');
   readCollection('withdrawals');
   readCollection('payouts');
+  readCollection('distributions');
+  readCollection('profitLedger');
+  readCollection('wallets');
+  readCollection('auditLog');
 };
 
 const DB = {
@@ -725,6 +729,358 @@ const DB = {
       items = items.filter(i => i._id !== id);
       writeCollection('profitImages', items);
       return item;
+    }
+  },
+
+  // ─── Profit Distribution System ─────────────────────────────
+  distributions: {
+    preview: async (projectId, profitPerShare) => {
+      const allInvestments = readCollection('investments');
+      const investments = allInvestments.filter(i =>
+        i.projectId === projectId && ['active', 'completed'].includes(i.status)
+      );
+
+      if (!investments.length) return { investors: [], totalShares: 0, totalInvestors: 0, grandTotal: 0 };
+
+      const investorMap = new Map();
+      for (const inv of investments) {
+        const shares = Number(inv.sharesCount) || 0;
+        if (shares <= 0) continue;
+        const existing = investorMap.get(inv.investorId);
+        if (existing) {
+          existing.totalShares += shares;
+          existing.investments.push({ investmentId: inv._id, shares });
+        } else {
+          investorMap.set(inv.investorId, {
+            investorId: inv.investorId,
+            totalShares: shares,
+            investments: [{ investmentId: inv._id, shares }]
+          });
+        }
+      }
+
+      const users = readCollection('users');
+      const investors = [];
+      let totalShares = 0;
+      let grandTotal = 0;
+      for (const [id, data] of investorMap) {
+        const user = users.find(u => u._id === id);
+        const profit = data.totalShares * profitPerShare;
+        totalShares += data.totalShares;
+        grandTotal += profit;
+        investors.push({
+          investorId: id,
+          investorName: user ? user.name : 'Unknown',
+          investorEmail: user ? user.email : '',
+          totalShares: data.totalShares,
+          profitPerShare,
+          calculatedProfit: profit,
+          investments: data.investments
+        });
+      }
+
+      return { investors, totalShares, totalInvestors: investors.length, grandTotal };
+    },
+
+    confirm: async (projectId, profitPerShare, month, year, adminId) => {
+      const distributions = readCollection('distributions');
+      const existing = distributions.find(d =>
+        d.projectId === projectId && d.month === month && d.year === year
+      );
+      if (existing) {
+        throw new Error(`Profit already distributed for this project for ${month}/${year}`);
+      }
+
+      const preview = await DB.distributions.preview(projectId, profitPerShare);
+      if (!preview.investors.length) {
+        throw new Error('No investors with shares found for this project');
+      }
+
+      const now = new Date().toISOString();
+
+      // 1. Create distribution record
+      const distribution = {
+        _id: generateId(),
+        projectId,
+        profitPerShare,
+        month,
+        year,
+        totalShares: preview.totalShares,
+        totalInvestors: preview.totalInvestors,
+        totalDistributed: preview.grandTotal,
+        status: 'completed',
+        createdBy: adminId,
+        createdAt: now
+      };
+      distributions.push(distribution);
+      writeCollection('distributions', distributions);
+
+      // 2. Create ledger entries
+      const ledger = readCollection('profitLedger');
+      for (const inv of preview.investors) {
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          ledger.push({
+            _id: generateId(),
+            distributionId: distribution._id,
+            investorId: inv.investorId,
+            projectId,
+            investmentId: invDetail.investmentId,
+            shares: invDetail.shares,
+            profitPerShare,
+            calculatedProfit: profit,
+            month,
+            year,
+            createdAt: now
+          });
+        }
+      }
+      writeCollection('profitLedger', ledger);
+
+      // 3. Update wallets and investments
+      const wallets = readCollection('wallets');
+      const investments = readCollection('investments');
+
+      for (const inv of preview.investors) {
+        // Wallet
+        let walletIdx = wallets.findIndex(w => w.investorId === inv.investorId);
+        if (walletIdx === -1) {
+          wallets.push({
+            _id: generateId(),
+            investorId: inv.investorId,
+            availableBalance: 0,
+            pendingBalance: 0,
+            withdrawnBalance: 0,
+            createdAt: now,
+            updatedAt: now
+          });
+          walletIdx = wallets.length - 1;
+        }
+        wallets[walletIdx].availableBalance = (Number(wallets[walletIdx].availableBalance) || 0) + inv.calculatedProfit;
+        wallets[walletIdx].updatedAt = now;
+
+        // Investment returnEarned
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          const invIdx = investments.findIndex(i => i._id === invDetail.investmentId);
+          if (invIdx !== -1) {
+            investments[invIdx].returnEarned = (Number(investments[invIdx].returnEarned) || 0) + profit;
+            investments[invIdx].profitNotAssigned = false;
+            investments[invIdx].paymentHistory = investments[invIdx].paymentHistory || [];
+            investments[invIdx].paymentHistory.push({
+              type: 'profit_distribution',
+              label: `Profit Distribution (${month}/${year})`,
+              amount: profit,
+              date: now
+            });
+          }
+        }
+      }
+      writeCollection('wallets', wallets);
+      writeCollection('investments', investments);
+
+      // 4. Audit log
+      const auditLogs = readCollection('auditLog');
+      auditLogs.push({
+        _id: generateId(),
+        action: 'profit_distribution',
+        performedBy: adminId,
+        metadata: {
+          distributionId: distribution._id,
+          projectId,
+          profitPerShare,
+          month,
+          year,
+          totalInvestors: preview.totalInvestors,
+          totalShares: preview.totalShares,
+          totalDistributed: preview.grandTotal
+        },
+        createdAt: now
+      });
+      writeCollection('auditLog', auditLogs);
+
+      return distribution;
+    },
+
+    find: async (query = {}) => {
+      let data = readCollection('distributions');
+      if (query.projectId) data = data.filter(d => d.projectId === query.projectId);
+      if (query.month) data = data.filter(d => d.month === Number(query.month));
+      if (query.year) data = data.filter(d => d.year === Number(query.year));
+      return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+
+    findById: async (id) => {
+      const data = readCollection('distributions');
+      return data.find(d => d._id === id) || null;
+    },
+
+    getLedgerByDistribution: async (distributionId) => {
+      const entries = readCollection('profitLedger').filter(e => e.distributionId === distributionId);
+      if (!entries.length) return [];
+      const users = readCollection('users');
+      return entries.map(e => {
+        const user = users.find(u => u._id === e.investorId);
+        return {
+          ...e,
+          investor: user ? { _id: user._id, name: user.name, email: user.email } : null
+        };
+      });
+    },
+
+    getInvestorLedger: async (investorId) => {
+      const entries = readCollection('profitLedger')
+        .filter(e => e.investorId === investorId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      if (!entries.length) return [];
+      const projects = readCollection('projects');
+      return entries.map(e => {
+        const proj = projects.find(p => p._id === e.projectId);
+        return {
+          ...e,
+          project: proj ? { _id: proj._id, title: proj.title, category: proj.category } : null
+        };
+      });
+    },
+
+    getInvestorSummary: async (investorId) => {
+      const entries = readCollection('profitLedger').filter(e => e.investorId === investorId);
+      const wallets = readCollection('wallets');
+      const wallet = wallets.find(w => w.investorId === investorId);
+
+      const totalEarned = entries.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+
+      const projectMap = new Map();
+      for (const e of entries) {
+        const existing = projectMap.get(e.projectId);
+        if (existing) {
+          existing.totalProfit += Number(e.calculatedProfit) || 0;
+          existing.totalShares += Number(e.shares) || 0;
+          existing.distributions += 1;
+        } else {
+          projectMap.set(e.projectId, {
+            projectId: e.projectId,
+            totalProfit: Number(e.calculatedProfit) || 0,
+            totalShares: Number(e.shares) || 0,
+            distributions: 1
+          });
+        }
+      }
+
+      const projects = readCollection('projects');
+      for (const p of projects) {
+        const entry = projectMap.get(p._id);
+        if (entry) {
+          entry.projectTitle = p.title;
+          entry.projectCategory = p.category;
+        }
+      }
+
+      const monthlyMap = new Map();
+      for (const e of entries) {
+        const key = `${e.year}-${String(e.month).padStart(2, '0')}`;
+        const existing = monthlyMap.get(key);
+        if (existing) {
+          existing.amount += Number(e.calculatedProfit) || 0;
+        } else {
+          monthlyMap.set(key, { month: e.month, year: e.year, amount: Number(e.calculatedProfit) || 0 });
+        }
+      }
+
+      return {
+        totalEarned,
+        wallet: wallet || { availableBalance: 0, pendingBalance: 0, withdrawnBalance: 0 },
+        perProject: Array.from(projectMap.values()),
+        monthly: Array.from(monthlyMap.values()).sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return b.month - a.month;
+        })
+      };
+    },
+
+    populateAll: async (list) => {
+      if (!list.length) return [];
+      const projects = readCollection('projects');
+      const users = readCollection('users');
+      return list.map(d => {
+        const proj = projects.find(p => p._id === d.projectId);
+        const admin = users.find(u => u._id === d.createdBy);
+        return {
+          ...d,
+          project: proj ? { _id: proj._id, title: proj.title, category: proj.category } : null,
+          admin: admin ? { _id: admin._id, name: admin.name, email: admin.email } : null
+        };
+      });
+    }
+  },
+
+  wallets: {
+    getOrCreate: async (investorId) => {
+      const wallets = readCollection('wallets');
+      let wallet = wallets.find(w => w.investorId === investorId);
+      if (!wallet) {
+        const now = new Date().toISOString();
+        wallet = {
+          _id: generateId(),
+          investorId,
+          availableBalance: 0,
+          pendingBalance: 0,
+          withdrawnBalance: 0,
+          createdAt: now,
+          updatedAt: now
+        };
+        wallets.push(wallet);
+        writeCollection('wallets', wallets);
+      }
+      return wallet;
+    },
+    getByInvestorId: async (investorId) => {
+      const wallets = readCollection('wallets');
+      return wallets.find(w => w.investorId === investorId) || null;
+    },
+    credit: async (investorId, amount) => {
+      const wallets = readCollection('wallets');
+      const now = new Date().toISOString();
+      let idx = wallets.findIndex(w => w.investorId === investorId);
+      if (idx === -1) {
+        wallets.push({
+          _id: generateId(),
+          investorId,
+          availableBalance: 0,
+          pendingBalance: 0,
+          withdrawnBalance: 0,
+          createdAt: now,
+          updatedAt: now
+        });
+        idx = wallets.length - 1;
+      }
+      wallets[idx].availableBalance = (Number(wallets[idx].availableBalance) || 0) + amount;
+      wallets[idx].updatedAt = now;
+      writeCollection('wallets', wallets);
+      return wallets[idx];
+    }
+  },
+
+  auditLog: {
+    create: async (entry) => {
+      const logs = readCollection('auditLog');
+      const newItem = {
+        _id: generateId(),
+        action: entry.action,
+        performedBy: entry.performedBy,
+        targetUserId: entry.targetUserId || '',
+        metadata: entry.metadata || {},
+        createdAt: new Date().toISOString()
+      };
+      logs.push(newItem);
+      writeCollection('auditLog', logs);
+      return newItem;
+    },
+    find: async (query = {}) => {
+      let data = readCollection('auditLog');
+      if (query.action) data = data.filter(l => l.action === query.action);
+      if (query.performedBy) data = data.filter(l => l.performedBy === query.performedBy);
+      return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
   }
 };

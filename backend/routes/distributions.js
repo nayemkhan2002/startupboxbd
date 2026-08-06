@@ -30,7 +30,7 @@ router.post('/preview', protect, adminOnly, async (req, res) => {
 // Admin: Confirm distribution (transactional)
 router.post('/confirm', protect, adminOnly, async (req, res) => {
   try {
-    const { projectId, profitPerShare, month, year } = req.body;
+    const { projectId, profitPerShare, month, year, distributionDate } = req.body;
     if (!projectId) return res.status(400).json({ message: 'Project is required' });
 
     const pps = Number(profitPerShare);
@@ -44,7 +44,7 @@ router.post('/confirm', protect, adminOnly, async (req, res) => {
     const project = await DB.projects.findById(projectId);
     if (!project) return res.status(400).json({ message: 'Invalid project' });
 
-    const distribution = await DB.distributions.confirm(projectId, pps, m, y, req.user._id);
+    const distribution = await DB.distributions.confirm(projectId, pps, m, y, req.user._id, distributionDate || null);
     res.status(201).json({
       ...distribution,
       project: { _id: project._id, title: project.title },

@@ -133,6 +133,7 @@ const profitDistributionSchema = new mongoose.Schema({
   totalDistributed: { type: Number, default: 0 },
   status: { type: String, default: 'completed' },
   createdBy: { type: String, index: true },
+  distributionDate: String,
   createdAt: String
 }, opts);
 

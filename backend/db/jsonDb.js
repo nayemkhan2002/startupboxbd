@@ -782,7 +782,7 @@ const DB = {
       return { investors, totalShares, totalInvestors: investors.length, grandTotal };
     },
 
-    confirm: async (projectId, profitPerShare, month, year, adminId) => {
+    confirm: async (projectId, profitPerShare, month, year, adminId, distributionDate) => {
       const distributions = readCollection('distributions');
       const existing = distributions.find(d =>
         d.projectId === projectId && d.month === month && d.year === year
@@ -796,7 +796,7 @@ const DB = {
         throw new Error('No investors with shares found for this project');
       }
 
-      const now = new Date().toISOString();
+      const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
 
       // 1. Create distribution record
       const distribution = {
@@ -810,6 +810,7 @@ const DB = {
         totalDistributed: preview.grandTotal,
         status: 'completed',
         createdBy: adminId,
+        distributionDate: distributionDate || now,
         createdAt: now
       };
       distributions.push(distribution);
@@ -891,6 +892,7 @@ const DB = {
           profitPerShare,
           month,
           year,
+          distributionDate: distributionDate || now,
           totalInvestors: preview.totalInvestors,
           totalShares: preview.totalShares,
           totalDistributed: preview.grandTotal

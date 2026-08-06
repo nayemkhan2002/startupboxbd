@@ -681,7 +681,7 @@ const DB = {
      * Confirm distribution — full transactional write.
      * Creates distribution record, ledger entries, wallet credits, and audit log.
      */
-    confirm: async (projectId, profitPerShare, month, year, adminId) => {
+    confirm: async (projectId, profitPerShare, month, year, adminId, distributionDate) => {
       // Check for duplicates BEFORE starting the transaction
       const existing = await ProfitDistribution.findOne({ projectId, month, year }).lean();
       if (existing) {
@@ -694,7 +694,7 @@ const DB = {
         throw new Error('No investors with shares found for this project');
       }
 
-      const now = new Date().toISOString();
+      const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
       const session = await mongoose.startSession();
       let distribution;
 
@@ -711,6 +711,7 @@ const DB = {
             totalDistributed: preview.grandTotal,
             status: 'completed',
             createdBy: adminId,
+            distributionDate: distributionDate || now,
             createdAt: now
           }], { session });
           distribution = distDoc.toObject();
@@ -790,6 +791,7 @@ const DB = {
               profitPerShare,
               month,
               year,
+              distributionDate: distributionDate || now,
               totalInvestors: preview.totalInvestors,
               totalShares: preview.totalShares,
               totalDistributed: preview.grandTotal

@@ -133,6 +133,15 @@
             <select id="distYear" required></select>
           </div>
         </div>
+        <div class="dist-form-row">
+          <div class="form-group">
+            <label for="distDate">Distribution Start Date</label>
+            <input type="date" id="distDate" required>
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;">
+            <p style="font-size:0.8rem;color:var(--text-muted);margin:0;line-height:1.5;">📅 Select the start date when this weekly profit begins for investors.</p>
+          </div>
+        </div>
         <div class="dist-actions">
           <button type="button" class="btn-preview" id="preview-btn">Preview Distribution</button>
           <button type="button" class="btn-confirm" id="confirm-btn" disabled>Confirm Distribution</button>
@@ -246,6 +255,7 @@
           const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
           const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
           const period = m.month && m.year ? `${MONTH_NAMES[m.month]} ${m.year}` : '—';
+          const startDateStr = m.distributionDate ? new Date(m.distributionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
           return `
             <div class="audit-entry">
@@ -254,6 +264,10 @@
                 <span class="audit-entry-time">${dateStr} · ${timeStr}</span>
               </div>
               <div class="audit-entry-details">
+                <div class="audit-detail-item">
+                  <span class="adl">Start Date</span>
+                  <span class="adv">${escapeHtml(startDateStr)}</span>
+                </div>
                 <div class="audit-detail-item">
                   <span class="adl">Period</span>
                   <span class="adv">${escapeHtml(period)}</span>
@@ -306,8 +320,10 @@
         yearSelect.appendChild(opt);
       }
 
-      // Set current month
+      // Set current month and default date
       document.getElementById('distMonth').value = new Date().getMonth() + 1;
+      const todayIso = new Date().toISOString().split('T')[0];
+      document.getElementById('distDate').value = todayIso;
 
       // Load projects
       try {
@@ -332,11 +348,13 @@
         const profitPerShare = Number(document.getElementById('profitPerShare').value);
         const month = document.getElementById('distMonth').value;
         const year = document.getElementById('distYear').value;
+        const distDate = document.getElementById('distDate').value;
 
         if (!projectId) return showToast('Please select a project', 'error');
         if (!profitPerShare || profitPerShare <= 0) return showToast('Profit per share must be greater than zero', 'error');
         if (!month) return showToast('Please select a month', 'error');
         if (!year) return showToast('Please select a year', 'error');
+        if (!distDate) return showToast('Please select a distribution start date', 'error');
 
         const btn = document.getElementById('preview-btn');
         btn.disabled = true;
@@ -360,8 +378,9 @@
             return;
           }
 
+          const formattedDistDate = new Date(distDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
           document.getElementById('preview-project-badge').textContent =
-            `${previewData.project?.title || 'Project'} — ${MONTH_NAMES[Number(month)]} ${year}`;
+            `${previewData.project?.title || 'Project'} — Start Date: ${formattedDistDate} (${MONTH_NAMES[Number(month)]} ${year})`;
 
           tbody.innerHTML = previewData.investors.map((inv, i) => `
             <tr>
@@ -409,12 +428,15 @@
 
         const month = document.getElementById('distMonth').value;
         const year = document.getElementById('distYear').value;
+        const distDate = document.getElementById('distDate').value;
+        const formattedDistDate = distDate ? new Date(distDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today';
         const profitPerShare = document.getElementById('profitPerShare').value;
         const projectSelect = document.getElementById('projectId');
         const projectName = projectSelect.options[projectSelect.selectedIndex]?.textContent || 'Project';
 
         document.getElementById('confirm-detail').innerHTML = `
           <strong>Project:</strong> ${escapeHtml(projectName)}<br>
+          <strong>Start Date:</strong> <span style="color:var(--gold);font-weight:700;">${escapeHtml(formattedDistDate)}</span><br>
           <strong>Period:</strong> ${MONTH_NAMES[Number(month)]} ${year}<br>
           <strong>Profit Per Share:</strong> ${formatMoney(profitPerShare)}<br>
           <strong>Total Investors:</strong> ${previewData.totalInvestors}<br>
@@ -448,7 +470,8 @@
               projectId: document.getElementById('projectId').value,
               profitPerShare: Number(document.getElementById('profitPerShare').value),
               month: Number(document.getElementById('distMonth').value),
-              year: Number(document.getElementById('distYear').value)
+              year: Number(document.getElementById('distYear').value),
+              distributionDate: document.getElementById('distDate').value
             })
           });
 

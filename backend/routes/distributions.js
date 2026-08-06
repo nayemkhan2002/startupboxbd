@@ -174,4 +174,23 @@ router.get('/audit-log', protect, adminOnly, async (req, res) => {
   }
 });
 
+// Admin: Delete distribution / audit log entry
+router.delete('/audit-log/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const result = await DB.distributions.deleteDistribution(req.params.id);
+    res.json({ message: 'Distribution record deleted successfully', ...result });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.delete('/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const result = await DB.distributions.deleteDistribution(req.params.id);
+    res.json({ message: 'Distribution record deleted successfully', ...result });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

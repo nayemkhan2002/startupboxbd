@@ -225,12 +225,29 @@
     .audit-detail-item .adv.accent{color:var(--gold);}
     .audit-admin-tag{display:inline-flex;align-items:center;gap:5px;font-size:0.78rem;color:var(--text-muted);margin-top:8px;background:var(--bg-subtle);padding:4px 12px;border-radius:16px;}
     .audit-admin-tag .admin-icon{font-size:0.9rem;}
+    .audit-footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px;}
+    .btn-delete-audit{background:rgba(239,68,68,0.1);color:#DC2626;border:1px solid rgba(239,68,68,0.25);padding:4px 12px;border-radius:14px;font-size:0.78rem;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:4px;}
+    .btn-delete-audit:hover{background:#DC2626;color:#fff;border-color:#DC2626;box-shadow:0 2px 8px rgba(220,38,38,0.25);}
   </style>
 
   <script src="/assets/js/api.js"></script>
   <script>
     const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
     let previewData = null;
+
+    // Delete audit log / distribution record
+    async function deleteAuditLog(id, title) {
+      if (!confirm(`Are you sure you want to delete this profit distribution for "${title}"?\nThis will revert investor balances and delete this distribution record.`)) {
+        return;
+      }
+      try {
+        await apiFetch(`/distributions/audit-log/${id}`, { method: 'DELETE' });
+        showToast(`🗑️ Distribution for "${title}" deleted successfully`, 'success');
+        await loadAuditLog();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
 
     // Load and render audit log
     async function loadAuditLog() {
@@ -256,11 +273,12 @@
           const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
           const period = m.month && m.year ? `${MONTH_NAMES[m.month]} ${m.year}` : '—';
           const startDateStr = m.distributionDate ? new Date(m.distributionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+          const pTitle = log.projectTitle || 'Project';
 
           return `
             <div class="audit-entry">
               <div class="audit-entry-header">
-                <span class="audit-entry-title">${escapeHtml(log.projectTitle || 'Project')}</span>
+                <span class="audit-entry-title">${escapeHtml(pTitle)}</span>
                 <span class="audit-entry-time">${dateStr} · ${timeStr}</span>
               </div>
               <div class="audit-entry-details">
@@ -289,8 +307,13 @@
                   <span class="adv green">${formatMoney(m.totalDistributed || 0)}</span>
                 </div>
               </div>
-              <div class="audit-admin-tag">
-                <span class="admin-icon">🛡️</span> By ${escapeHtml(log.adminName || 'Admin')}
+              <div class="audit-footer-row">
+                <div class="audit-admin-tag">
+                  <span class="admin-icon">🛡️</span> By ${escapeHtml(log.adminName || 'Admin')}
+                </div>
+                <button type="button" class="btn-delete-audit" onclick="deleteAuditLog('${log._id}', '${escapeHtml(pTitle).replace(/'/g, "\\'")}')">
+                  🗑️ Delete Distribution
+                </button>
               </div>
             </div>`;
         }).join('')}</div>`;

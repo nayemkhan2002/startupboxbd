@@ -966,6 +966,52 @@ const DB = {
     }
   },
 
+  distributions: {
+    deleteDistribution: async (id) => {
+      // Find audit log or distribution doc by id
+      let log = await AuditLog.findById(id).lean();
+      let distId = id;
+      if (log) {
+        distId = log.metadata?.distributionId || id;
+      } else {
+        log = await AuditLog.findOne({ 'metadata.distributionId': id }).lean();
+      }
+
+      if (distId) {
+        const ledgers = await InvestorProfitLedger.find({ distributionId: distId }).lean();
+        for (const entry of ledgers) {
+          if (entry.investorId && entry.calculatedProfit) {
+            const wallet = await Wallet.findOne({ investorId: entry.investorId }).lean();
+            if (wallet) {
+              const newBal = Math.max(0, (wallet.availableBalance || 0) - entry.calculatedProfit);
+              await Wallet.updateOne({ investorId: entry.investorId }, { $set: { availableBalance: newBal } });
+            }
+          }
+          if (entry.investmentId && entry.calculatedProfit) {
+            const inv = await Investment.findById(entry.investmentId).lean();
+            if (inv) {
+              const newEarned = Math.max(0, (inv.returnEarned || 0) - entry.calculatedProfit);
+              const updatedHistory = (inv.paymentHistory || []).filter(h => h.type !== 'profit_distribution' || h.amount !== entry.calculatedProfit);
+              await Investment.updateOne({ _id: entry.investmentId }, {
+                $set: { returnEarned: newEarned, paymentHistory: updatedHistory }
+              });
+            }
+          }
+        }
+
+        await InvestorProfitLedger.deleteMany({ distributionId: distId });
+        await ProfitDistribution.deleteOne({ _id: distId });
+      }
+
+      // Delete matching audit log entries
+      await AuditLog.deleteMany({
+        $or: [{ _id: id }, { 'metadata.distributionId': distId }]
+      });
+
+      return { success: true };
+    }
+  },
+
   auditLog: {
     create: async (entry) => {
       const doc = await AuditLog.create({

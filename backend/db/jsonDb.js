@@ -917,6 +917,58 @@ const DB = {
       return data.find(d => d._id === id) || null;
     },
 
+    deleteDistribution: async (id) => {
+      const auditLogs = readCollection('auditLog');
+      let log = auditLogs.find(l => l._id === id);
+      let distId = id;
+      if (log) {
+        distId = log.metadata?.distributionId || id;
+      } else {
+        log = auditLogs.find(l => l.metadata?.distributionId === id);
+      }
+
+      if (distId) {
+        const ledger = readCollection('profitLedger');
+        const affectedEntries = ledger.filter(e => e.distributionId === distId);
+
+        // Revert Wallets and Investments
+        const wallets = readCollection('wallets');
+        const investments = readCollection('investments');
+
+        for (const entry of affectedEntries) {
+          if (entry.investorId && entry.calculatedProfit) {
+            const wIdx = wallets.findIndex(w => w.investorId === entry.investorId);
+            if (wIdx !== -1) {
+              wallets[wIdx].availableBalance = Math.max(0, (Number(wallets[wIdx].availableBalance) || 0) - entry.calculatedProfit);
+            }
+          }
+          if (entry.investmentId && entry.calculatedProfit) {
+            const iIdx = investments.findIndex(i => i._id === entry.investmentId);
+            if (iIdx !== -1) {
+              investments[iIdx].returnEarned = Math.max(0, (Number(investments[iIdx].returnEarned) || 0) - entry.calculatedProfit);
+              investments[iIdx].paymentHistory = (investments[iIdx].paymentHistory || []).filter(h => h.type !== 'profit_distribution' || h.amount !== entry.calculatedProfit);
+            }
+          }
+        }
+
+        writeCollection('wallets', wallets);
+        writeCollection('investments', investments);
+
+        // Delete from profitLedger and distributions
+        const filteredLedger = ledger.filter(e => e.distributionId !== distId);
+        writeCollection('profitLedger', filteredLedger);
+
+        const distributions = readCollection('distributions').filter(d => d._id !== distId);
+        writeCollection('distributions', distributions);
+      }
+
+      // Delete from auditLog
+      const filteredAuditLogs = auditLogs.filter(l => l._id !== id && l.metadata?.distributionId !== distId);
+      writeCollection('auditLog', filteredAuditLogs);
+
+      return { success: true };
+    },
+
     getLedgerByDistribution: async (distributionId) => {
       const entries = readCollection('profitLedger').filter(e => e.distributionId === distributionId);
       if (!entries.length) return [];

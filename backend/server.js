@@ -35,12 +35,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
-const PORT = process.env.PORT || 5000;
-
-// Start HTTP server immediately to bind port for Passenger health check
-const server = app.listen(PORT, () => {
-  console.log(`Server running smoothly on port ${PORT}`);
-});
+// Detect LiteSpeed / Phusion Passenger environment
+const isPassenger = typeof process.env.PASSENGER_APP_ENV !== 'undefined' ||
+                    typeof process.env.PASSENGER_ENVIRONMENT !== 'undefined' ||
+                    (require.main && require.main.filename && require.main.filename.toLowerCase().includes('passenger'));
 
 // Initialize Database asynchronously
 DB.initDb().then(() => {
@@ -48,5 +46,13 @@ DB.initDb().then(() => {
 }).catch(err => {
   console.error('Failed to initialize database:', err);
 });
+
+// Standalone mode: listen on PORT directly (Passenger handles listening automatically via module.exports)
+if (!isPassenger) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`Server running smoothly on port ${PORT}`);
+  });
+}
 
 module.exports = app;

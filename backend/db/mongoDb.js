@@ -534,12 +534,14 @@ const DB = {
         createdAt: new Date().toISOString()
       });
 
-      // Increment the investment's earned balance atomically.
+      // Increment the investment's earned balance safely.
       if (payload.investmentId) {
+        const invDoc = await Investment.findById(payload.investmentId).lean();
+        const currentEarned = invDoc && typeof invDoc.returnEarned === 'number' ? invDoc.returnEarned : 0;
         await Investment.updateOne(
           { _id: payload.investmentId },
           {
-            $inc: { returnEarned: amount },
+            $set: { returnEarned: currentEarned + amount },
             $push: {
               paymentHistory: {
                 type: 'profit_payout',
@@ -752,14 +754,18 @@ const DB = {
               { upsert: true, session }
             );
 
-            // Increment returnEarned on each investment record (backward compat)
+            // Update returnEarned safely on each investment record
             for (const invDetail of inv.investments) {
               const profit = invDetail.shares * profitPerShare;
+              const currentInv = await Investment.findById(invDetail.investmentId).lean().session(session);
+              const currentEarned = currentInv && typeof currentInv.returnEarned === 'number' ? currentInv.returnEarned : 0;
               await Investment.updateOne(
                 { _id: invDetail.investmentId },
                 {
-                  $inc: { returnEarned: profit },
-                  $set: { profitNotAssigned: false },
+                  $set: {
+                    returnEarned: currentEarned + profit,
+                    profitNotAssigned: false
+                  },
                   $push: {
                     paymentHistory: {
                       type: 'profit_distribution',

@@ -20,11 +20,15 @@ const MONTH_NAMES = [
 router.post('/process-due', protect, adminOnly, async (req, res) => {
   try {
     const adminId = req.user.role === 'admin' ? req.user._id : 'system';
-    const processed = await processDueCycles({
+    const result = await processDueCycles({
       adminId,
       scheduleId: req.body.scheduleId || null
     });
-    res.json({ processed: processed.length, items: processed });
+    res.json({
+      processed: result.processed.length,
+      items: result.processed,
+      errors: result.errors
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -206,21 +210,28 @@ router.get('/my/summary', protect, async (req, res) => {
     const activeSchedules = await DB.profitSchedules.find({ status: 'active' });
     const upcoming = [];
     for (const schedule of activeSchedules) {
-      const investments = await DB.investments.find({ investorId, projectId: schedule.projectId });
-      const hasShares = investments.some(i =>
-        ['active', 'completed'].includes(i.status) && (Number(i.sharesCount) || 0) > 0
-      );
-      if (!hasShares) continue;
-      const project = await DB.projects.findById(schedule.projectId);
+      const fresh = await DB.profitSchedules.findById(schedule._id);
+      if (!fresh || fresh.status !== 'active') continue;
+
+      const investments = await DB.investments.find({ investorId, projectId: fresh.projectId });
+      const investorShares = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+      if (investorShares <= 0) continue;
+
+      const project = await DB.projects.findById(fresh.projectId);
+      const dueNow = getDueCycleNumbers(fresh).length > 0;
       upcoming.push({
-        projectId: schedule.projectId,
+        projectId: fresh.projectId,
         projectTitle: project ? project.title : 'Project',
-        cycleType: schedule.cycleType,
-        cycleDays: CYCLE_DAYS[schedule.cycleType] || 7,
-        profitPerShare: schedule.profitPerShare,
-        nextDueDate: getNextDueDate(schedule),
-        nextCycleNumber: (schedule.cyclesProcessed || 0) + 1,
-        dueNow: getDueCycleNumbers(schedule).length > 0
+        cycleType: fresh.cycleType,
+        cycleDays: CYCLE_DAYS[fresh.cycleType] || 7,
+        profitPerShare: fresh.profitPerShare,
+        investorShares,
+        expectedProfit: investorShares * Number(fresh.profitPerShare || 0),
+        nextDueDate: getNextDueDate(fresh),
+        nextCycleNumber: (fresh.cyclesProcessed || 0) + 1,
+        dueNow
       });
     }
     summary.upcomingProfits = upcoming;

@@ -26,6 +26,7 @@
     .pb-card .pb-stat-item .lbl{font-size:0.75rem;color:var(--text-muted);font-weight:600;}
     .pb-card .pb-stat-item .val{font-size:1rem;font-weight:800;color:var(--navy);font-family:var(--font-en);}
     .pb-card .pb-stat-item .val.green{color:#10B981;}
+    .pb-card .pb-stat-item .val.due-today{color:#10B981;font-weight:800;}
     .chart-container{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:24px;box-shadow:var(--shadow-sm);}
     .chart-container h3{font-size:1.05rem;color:var(--navy);margin-bottom:18px;}
     .monthly-bars{display:flex;align-items:flex-end;gap:12px;height:160px;padding-top:20px;overflow-x:auto;}
@@ -142,6 +143,12 @@
   <script>
     const MONTH_NAMES = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+    const formatDateOnly = (str) => {
+      if (!str) return '—';
+      const [y, m, d] = String(str).split('-');
+      return `${d}/${m}/${y}`;
+    };
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('investor');
       if (!user) return;
@@ -157,8 +164,8 @@
 
     async function loadData() {
       try {
-        const [summary, ledger, stats] = await Promise.all([
-          apiFetch('/distributions/my/summary'),
+        const summary = await apiFetch('/distributions/my/summary');
+        const [ledger, stats] = await Promise.all([
           apiFetch('/distributions/my'),
           apiFetch('/investments/stats')
         ]);
@@ -175,10 +182,20 @@
           upcomingEl.innerHTML = summary.upcomingProfits.map(u => `
             <div class="pb-card">
               <h4>${escapeHtml(u.projectTitle)}</h4>
-              <span class="text-muted" style="font-size:0.75rem;">${u.cycleType === 'monthly' ? 'Monthly' : 'Weekly'} · ৳${Number(u.profitPerShare).toLocaleString()}/share</span>
+              <span class="text-muted" style="font-size:0.75rem;">${u.cycleType === 'monthly' ? 'Monthly' : 'Weekly'} · ৳${Number(u.profitPerShare).toLocaleString()}/share · ${Number(u.investorShares || 0).toLocaleString()} shares</span>
               <div class="pb-stats">
-                <div class="pb-stat-item"><div class="lbl">Next Payout</div><div class="val">${u.dueNow ? 'Due now' : new Date(u.nextDueDate).toLocaleDateString('en-GB')}</div></div>
-                <div class="pb-stat-item"><div class="lbl">Cycle #</div><div class="val">${u.nextCycleNumber}</div></div>
+                <div class="pb-stat-item">
+                  <div class="lbl">Next Payout</div>
+                  <div class="val ${u.dueNow ? 'green' : ''}">${u.dueNow ? 'Due today' : formatDateOnly(u.nextDueDate)}</div>
+                </div>
+                <div class="pb-stat-item">
+                  <div class="lbl">Expected</div>
+                  <div class="val green">${formatMoney(u.expectedProfit || 0)}</div>
+                </div>
+                <div class="pb-stat-item">
+                  <div class="lbl">Cycle #</div>
+                  <div class="val">${u.nextCycleNumber}</div>
+                </div>
               </div>
             </div>`).join('');
         }

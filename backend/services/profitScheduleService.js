@@ -1,6 +1,7 @@
 const DB = require('../db');
 
 const CYCLE_DAYS = { weekly: 7, monthly: 30 };
+const BD_TIMEZONE = 'Asia/Dhaka';
 
 const parseDateOnly = (str) => {
   const [y, m, d] = String(str).split('-').map(Number);
@@ -14,21 +15,30 @@ const dateToIsoDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
+/** Today as YYYY-MM-DD in Bangladesh (UTC+6) — matches how admins set schedule dates */
+const getTodayDateStr = (asOf = new Date()) =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: BD_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(asOf);
+
 const getCycleDays = (cycleType) => CYCLE_DAYS[cycleType] || 7;
 
 const getDueCycleNumbers = (schedule, asOf = new Date()) => {
   if (schedule.status !== 'active') return [];
-  const start = parseDateOnly(schedule.startDate);
-  const cycleDays = getCycleDays(schedule.cycleType);
-  const today = new Date(asOf.getFullYear(), asOf.getMonth(), asOf.getDate());
-  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-  const daysSince = Math.floor((today - startDay) / 86400000);
-  if (daysSince < cycleDays) return [];
-
-  const totalCompleted = Math.floor(daysSince / cycleDays);
+  const todayStr = getTodayDateStr(asOf);
   const alreadyDone = schedule.cyclesProcessed || 0;
   const due = [];
-  for (let c = alreadyDone + 1; c <= totalCompleted; c++) due.push(c);
+  let cycle = alreadyDone + 1;
+
+  while (cycle <= alreadyDone + 52) {
+    const { periodEnd } = getCyclePeriod(schedule, cycle);
+    if (todayStr < periodEnd) break;
+    due.push(cycle);
+    cycle += 1;
+  }
   return due;
 };
 
@@ -68,36 +78,45 @@ const processDueCycles = async (options = {}) => {
     : await DB.profitSchedules.find({ status: 'active' });
 
   const processed = [];
-  for (const schedule of schedules) {
-    const dueCycles = getDueCycleNumbers(schedule);
-    for (const cycleNumber of dueCycles) {
-      const fresh = await DB.profitSchedules.findById(schedule._id);
-      if (!fresh || fresh.status !== 'active') break;
+  const errors = [];
 
-      const { periodStart, periodEnd } = getCyclePeriod(fresh, cycleNumber);
-      const endDate = parseDateOnly(periodEnd);
-      const dist = await DB.distributions.confirmScheduledCycle({
-        scheduleId: fresh._id,
-        projectId: fresh.projectId,
-        profitPerShare: fresh.profitPerShare,
-        cycleNumber,
-        cycleType: fresh.cycleType,
-        periodStart,
-        periodEnd,
-        month: endDate.getMonth() + 1,
-        year: endDate.getFullYear(),
-        adminId,
-        distributionDate: periodEnd
-      });
-      await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
-      processed.push({ scheduleId: fresh._id, cycleNumber, distribution: dist });
+  for (const schedule of schedules) {
+    try {
+      const dueCycles = getDueCycleNumbers(schedule);
+      for (const cycleNumber of dueCycles) {
+        const fresh = await DB.profitSchedules.findById(schedule._id);
+        if (!fresh || fresh.status !== 'active') break;
+
+        const { periodStart, periodEnd } = getCyclePeriod(fresh, cycleNumber);
+        const endDate = parseDateOnly(periodEnd);
+        const dist = await DB.distributions.confirmScheduledCycle({
+          scheduleId: fresh._id,
+          projectId: fresh.projectId,
+          profitPerShare: fresh.profitPerShare,
+          cycleNumber,
+          cycleType: fresh.cycleType,
+          periodStart,
+          periodEnd,
+          month: endDate.getMonth() + 1,
+          year: endDate.getFullYear(),
+          adminId,
+          distributionDate: periodEnd
+        });
+        await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
+        processed.push({ scheduleId: fresh._id, cycleNumber, distribution: dist });
+      }
+    } catch (err) {
+      console.error(`processDueCycles failed for schedule ${schedule._id}:`, err.message);
+      errors.push({ scheduleId: schedule._id, message: err.message });
     }
   }
-  return processed;
+  return { processed, errors };
 };
 
 module.exports = {
   CYCLE_DAYS,
+  BD_TIMEZONE,
+  getTodayDateStr,
   getDueCycleNumbers,
   getCyclePeriod,
   getNextDueDate,

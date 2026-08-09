@@ -164,16 +164,27 @@
 
     async function loadData() {
       try {
-        const summary = await apiFetch('/distributions/my/summary');
-        const [ledger, stats] = await Promise.all([
+        // Summary runs due profit cycles first, so the ledger below reflects them.
+        const summaryRes = await Promise.allSettled([apiFetch('/distributions/my/summary')]);
+        const [ledgerRes, statsRes] = await Promise.allSettled([
           apiFetch('/distributions/my'),
           apiFetch('/investments/stats')
         ]);
 
-        document.getElementById('w-total-earned').textContent = formatMoney(summary.totalEarned);
-        document.getElementById('w-available').textContent = formatMoney(stats.availableBalance);
-        document.getElementById('w-pending').textContent = formatMoney(stats.pendingWithdrawals);
-        document.getElementById('w-withdrawn').textContent = formatMoney(summary.wallet?.withdrawnBalance || 0);
+        const summary = summaryRes[0].status === 'fulfilled'
+          ? summaryRes[0].value
+          : { totalEarned: 0, perProject: [], monthly: [], upcomingProfits: [] };
+        const ledger = ledgerRes.status === 'fulfilled' ? ledgerRes.value : [];
+        const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
+
+        const failure = [summaryRes[0], ledgerRes, statsRes].find(r => r.status === 'rejected');
+        if (failure) showToast(failure.reason?.message || 'Some data could not be loaded', 'error');
+
+        const totalEarned = stats ? stats.totalReturnEarned : summary.totalEarned;
+        document.getElementById('w-total-earned').textContent = formatMoney(totalEarned);
+        document.getElementById('w-available').textContent = formatMoney(stats ? stats.availableBalance : 0);
+        document.getElementById('w-pending').textContent = formatMoney(stats ? stats.pendingWithdrawals : 0);
+        document.getElementById('w-withdrawn').textContent = formatMoney(stats ? stats.totalWithdrawn : 0);
 
         const upcomingCard = document.getElementById('upcoming-card');
         const upcomingEl = document.getElementById('upcoming-profits');

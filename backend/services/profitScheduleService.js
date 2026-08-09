@@ -78,9 +78,12 @@ const processDueCycles = async (options = {}) => {
     : await DB.profitSchedules.find({ status: 'active' });
 
   const processed = [];
+  const skipped = [];
   const errors = [];
 
   for (const schedule of schedules) {
+    // One bad schedule must never block the others, nor fail the request that
+    // triggered processing (investor pages call this on every load).
     try {
       const dueCycles = getDueCycleNumbers(schedule);
       for (const cycleNumber of dueCycles) {
@@ -103,14 +106,29 @@ const processDueCycles = async (options = {}) => {
           distributionDate: periodEnd
         });
         await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
-        processed.push({ scheduleId: fresh._id, cycleNumber, distribution: dist });
+
+        if (dist) {
+          processed.push({ scheduleId: fresh._id, cycleNumber, distribution: dist });
+        } else {
+          skipped.push({ scheduleId: fresh._id, cycleNumber, reason: 'No investors hold shares in this project' });
+        }
       }
     } catch (err) {
       console.error(`processDueCycles failed for schedule ${schedule._id}:`, err.message);
       errors.push({ scheduleId: schedule._id, message: err.message });
     }
   }
-  return { processed, errors };
+  return { processed, skipped, errors };
+};
+
+/** Never lets scheduled-profit processing break a read request. */
+const processDueCyclesSafe = async (options = {}) => {
+  try {
+    return await processDueCycles(options);
+  } catch (err) {
+    console.error('processDueCycles crashed:', err.message);
+    return { processed: [], skipped: [], errors: [{ message: err.message }] };
+  }
 };
 
 module.exports = {
@@ -121,5 +139,6 @@ module.exports = {
   getCyclePeriod,
   getNextDueDate,
   enrichSchedule,
-  processDueCycles
+  processDueCycles,
+  processDueCyclesSafe
 };

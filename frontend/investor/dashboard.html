@@ -149,23 +149,41 @@
       const recentEl = document.getElementById('recent-investments');
       const interestsEl = document.getElementById('interests-container');
 
+      // Settled rather than all: a single failing panel must not blank the dashboard.
+      const [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes] = await Promise.allSettled([
+        apiFetch('/investments/stats'),
+        apiFetch('/investments/my'),
+        apiFetch('/interest/my'),
+        apiFetch('/profile/me'),
+        apiFetch('/distributions/my')
+      ]);
+
+      const failures = [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes]
+        .filter(r => r.status === 'rejected');
+      if (failures.length) {
+        console.error('Dashboard partial load failure:', failures.map(f => f.reason?.message));
+        showToast(failures[0].reason?.message || 'Some data could not be loaded', 'error');
+      }
+
+      const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
+      const investments = investmentsRes.status === 'fulfilled' ? investmentsRes.value : [];
+      const interests = interestsRes.status === 'fulfilled' ? interestsRes.value : [];
+      const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
+      const profitLedger = ledgerRes.status === 'fulfilled' ? ledgerRes.value : [];
+
       try {
-        const [stats, investments, interests, profile, profitLedger] = await Promise.all([
-          apiFetch('/investments/stats'),
-          apiFetch('/investments/my'),
-          apiFetch('/interest/my'),
-          apiFetch('/profile/me'),
-          apiFetch('/distributions/my')
-        ]);
+        if (profile) {
+          syncLocalUser(profile);
+          renderAvatar(document.getElementById('user-avatar'), profile);
+        }
 
-        syncLocalUser(profile);
-        renderAvatar(document.getElementById('user-avatar'), profile);
-
-        document.getElementById('kpi-invested').textContent = formatMoney(stats.totalInvested);
-        document.getElementById('kpi-shares-hint').textContent = `Total Shares: ${Number(stats.totalShares || 0).toLocaleString()}`;
-        document.getElementById('kpi-active').textContent = stats.activeInvestments;
-        document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
-        document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
+        if (stats) {
+          document.getElementById('kpi-invested').textContent = formatMoney(stats.totalInvested);
+          document.getElementById('kpi-shares-hint').textContent = `Total Shares: ${Number(stats.totalShares || 0).toLocaleString()}`;
+          document.getElementById('kpi-active').textContent = stats.activeInvestments;
+          document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
+          document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
+        }
 
         // Render recent profit distributions
         const dashProfitTable = document.getElementById('dash-profit-table');
@@ -175,7 +193,7 @@
           const MONTHS = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
           dashProfitTable.innerHTML = profitLedger.slice(0, 5).map(e => `
             <tr>
-              <td><strong>${MONTHS[e.month] || e.month} ${e.year}</strong></td>
+              <td><strong>${e.cycleNumber ? `Cycle ${e.cycleNumber}` : `${MONTHS[e.month] || e.month} ${e.year}`}</strong></td>
               <td>${escapeHtml(e.project?.title || 'N/A')}</td>
               <td>${Number(e.shares).toLocaleString()}</td>
               <td>${formatMoney(e.profitPerShare)}</td>

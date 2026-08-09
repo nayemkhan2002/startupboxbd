@@ -6,6 +6,7 @@ const { adminOnly } = require('../middleware/adminOnly');
 const {
   enrichSchedule,
   processDueCycles,
+  processDueCyclesSafe,
   getDueCycleNumbers,
   getNextDueDate,
   CYCLE_DAYS
@@ -26,6 +27,7 @@ router.post('/process-due', protect, adminOnly, async (req, res) => {
     });
     res.json({
       processed: result.processed.length,
+      skipped: result.skipped.length,
       items: result.processed,
       errors: result.errors
     });
@@ -184,7 +186,7 @@ router.get('/my', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCycles({ adminId: 'system' });
+    await processDueCyclesSafe({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
@@ -201,7 +203,7 @@ router.get('/my/summary', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCycles({ adminId: 'system' });
+    await processDueCyclesSafe({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;

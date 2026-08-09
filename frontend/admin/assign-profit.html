@@ -327,8 +327,13 @@
       });
       if (result.processed > 0) {
         showToast(`✅ Processed ${result.processed} profit cycle(s)`, 'success');
+      } else if (result.skipped > 0) {
+        showToast(`${result.skipped} due cycle(s) skipped — no investors hold shares in those projects`, 'info');
       } else {
         showToast('No profit cycles are due yet', 'info');
+      }
+      if (result.errors && result.errors.length) {
+        showToast(result.errors[0].message, 'error');
       }
       await Promise.all([loadSchedules(), loadAuditLog()]);
     }

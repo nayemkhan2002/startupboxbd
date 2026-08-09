@@ -45,8 +45,32 @@ const connect = async () => {
   console.log(`MongoDB connected: ${mongoose.connection.host}/${mongoose.connection.name}`);
 };
 
+/**
+ * A pre-schedule deploy created a plain unique index on {projectId, month, year},
+ * which rejects the 2nd+ weekly cycle of a month. Mongoose cannot replace an index
+ * whose options changed, so the stale one is dropped explicitly.
+ */
+const reconcileDistributionIndexes = async () => {
+  try {
+    const coll = ProfitDistribution.collection;
+    const existing = await coll.indexes();
+    for (const idx of existing) {
+      const key = idx.key || {};
+      const isMonthYearKey = key.projectId === 1 && key.month === 1 && key.year === 1;
+      if (isMonthYearKey && idx.unique && !idx.partialFilterExpression) {
+        await coll.dropIndex(idx.name);
+        console.log(`Dropped legacy unique index "${idx.name}" on profit distributions`);
+      }
+    }
+    await ProfitDistribution.createIndexes();
+  } catch (err) {
+    console.warn('Profit distribution index reconciliation skipped:', err.message);
+  }
+};
+
 const initDb = async () => {
   await connect();
+  await reconcileDistributionIndexes();
 
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@startupboxbd.com';
   const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
@@ -466,9 +490,11 @@ const DB = {
       });
     },
     getPortfolioStats: async (investorId) => {
-      const investments = await Investment.find({ investorId }).lean();
-      const withdrawals = await Withdrawal.find({ investorId }).lean();
-      const wallet = await Wallet.findOne({ investorId }).lean();
+      const [investments, withdrawals, ledger] = await Promise.all([
+        Investment.find({ investorId }).lean(),
+        Withdrawal.find({ investorId }).lean(),
+        InvestorProfitLedger.find({ investorId }).lean()
+      ]);
 
       const totalInvested = investments
         .filter(i => ['active', 'completed', 'pending'].includes(i.status))
@@ -480,14 +506,22 @@ const DB = {
         .filter(i => i.status === 'active')
         .reduce((s, i) => s + (Number(i.expectedReturn) || 0), 0);
 
+      // Lifetime earnings live on the investments (written by every distribution and
+      // by legacy payouts), so they stay correct for pre-wallet records too.
+      const earnedFromInvestments = investments
+        .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
+      const earnedFromLedger = ledger
+        .reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+      const totalReturnEarned = Math.max(earnedFromInvestments, earnedFromLedger);
+
       const pendingWithdrawals = withdrawals
         .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      const totalWithdrawn = withdrawals
+        .filter(w => w.status === 'completed')
+        .reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
-      const walletAvailable = wallet ? Number(wallet.availableBalance) || 0 : 0;
-      const walletWithdrawn = wallet ? Number(wallet.withdrawnBalance) || 0 : 0;
-      const availableBalance = Math.max(0, walletAvailable - pendingWithdrawals);
-      const totalReturnEarned = walletAvailable + walletWithdrawn + pendingWithdrawals;
+      const availableBalance = Math.max(0, totalReturnEarned - totalWithdrawn - pendingWithdrawals);
 
       const totalShares = investments
         .filter(i => ['active', 'completed'].includes(i.status))
@@ -500,6 +534,7 @@ const DB = {
         totalReturnEarned,
         expectedReturn: expectedReturnActive,
         pendingWithdrawals,
+        totalWithdrawn,
         availableBalance,
         investmentCount: investments.length
       };
@@ -536,17 +571,23 @@ const DB = {
 
       if (newStatus === 'completed' && oldStatus !== 'completed') {
         const amt = Number(prev.amount) || 0;
+        const stats = await DB.investments.getPortfolioStats(prev.investorId);
+        // The request itself is counted as pending, so add it back before comparing.
+        const spendable = stats.availableBalance + amt;
+        if (amt > spendable) {
+          throw new Error(`Amount exceeds investor's earned balance (৳${spendable} available, ৳${amt} requested)`);
+        }
+
         const wallet = await Wallet.findOne({ investorId: prev.investorId }).lean();
         const avail = wallet ? Number(wallet.availableBalance) || 0 : 0;
-        if (avail < amt) {
-          throw new Error(`Insufficient wallet balance (৳${avail} available, ৳${amt} requested)`);
-        }
         await Wallet.findOneAndUpdate(
           { investorId: prev.investorId },
           {
-            $inc: { availableBalance: -amt, withdrawnBalance: amt },
-            $set: { updatedAt: now }
-          }
+            $set: { availableBalance: Math.max(0, avail - amt), updatedAt: now },
+            $inc: { withdrawnBalance: amt },
+            $setOnInsert: { investorId: prev.investorId, pendingBalance: 0, createdAt: now }
+          },
+          { upsert: true }
         );
 
         const existing = await Payout.findOne({ withdrawalId: id }).lean();
@@ -869,9 +910,9 @@ const DB = {
       if (existing) return existing;
 
       const preview = await DB.distributions.preview(projectId, profitPerShare);
-      if (!preview.investors.length) {
-        throw new Error('No investors with shares found for this project');
-      }
+      // A project with no share-holding investors is a valid no-op: the cycle is
+      // still consumed so the schedule keeps advancing instead of retrying forever.
+      if (!preview.investors.length) return null;
 
       const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
       const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
@@ -983,6 +1024,16 @@ const DB = {
             createdAt: now
           }], { session });
         });
+      } catch (err) {
+        // A stale unique index or a concurrent run can reject the insert; if the
+        // cycle already landed, treat it as done rather than failing the caller.
+        if (err && err.code === 11000) {
+          const already = await ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
+          if (already) return already;
+          console.warn(`Cycle ${cycleNumber} rejected by a duplicate-key index:`, err.message);
+          return null;
+        }
+        throw err;
       } finally {
         await session.endSession();
       }
@@ -1254,7 +1305,7 @@ const DB = {
 
   adminStats: {
     getDashboard: async () => {
-      const [projects, interests, investors, investments, withdrawals, distributions, wallets, schedules] =
+      const [projects, interests, investors, investments, withdrawals, distributions, schedules] =
         await Promise.all([
           Project.find({}).lean(),
           Interest.find({}).lean(),
@@ -1262,7 +1313,6 @@ const DB = {
           Investment.find({}).lean(),
           Withdrawal.find({}).lean(),
           ProfitDistribution.find({ status: 'completed' }).lean(),
-          Wallet.find({}).lean(),
           ProfitSchedule.find({ status: 'active' }).lean()
         ]);
 
@@ -1276,13 +1326,21 @@ const DB = {
       const activeInvestments = investments.filter(i => i.status === 'active').length;
       const investorsWithInvestment = new Set(investments.map(i => i.investorId).filter(Boolean)).size;
 
-      const totalProfitDistributed = distributions
+      const distributedFromCycles = distributions
         .reduce((s, d) => s + (Number(d.totalDistributed) || 0), 0);
-      const totalWalletAvailable = wallets.reduce((s, w) => s + (Number(w.availableBalance) || 0), 0);
-      const totalWithdrawn = wallets.reduce((s, w) => s + (Number(w.withdrawnBalance) || 0), 0);
+      const creditedToInvestments = investments
+        .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
+      const totalProfitDistributed = Math.max(distributedFromCycles, creditedToInvestments);
 
       const pendingList = withdrawals.filter(w => ['pending', 'approved', 'processing'].includes(w.status));
       const pendingWithdrawalAmount = pendingList.reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      const totalWithdrawn = withdrawals
+        .filter(w => w.status === 'completed')
+        .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      const totalWalletAvailable = Math.max(
+        0,
+        totalProfitDistributed - totalWithdrawn - pendingWithdrawalAmount
+      );
 
       const interestStatus = { pending: 0, reviewed: 0, contacted: 0, closed: 0 };
       interests.forEach((i) => {

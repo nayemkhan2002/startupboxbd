@@ -62,6 +62,31 @@
           </div>
         </div>
 
+        <div class="panel mb-3">
+          <div class="panel-header">
+            <div>
+              <h2 style="font-size:1.15rem;color:var(--navy);">Shares &amp; Profit by Project</h2>
+              <p class="text-muted" style="font-size:0.85rem;">Profit is credited per project — only projects on a profit schedule pay out</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Your Shares</th>
+                  <th>Earned So Far</th>
+                  <th>Profit Schedule</th>
+                  <th>Next Payout</th>
+                </tr>
+              </thead>
+              <tbody id="project-breakdown">
+                <tr><td colspan="5"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Wallet & Profit Distributions Panel -->
         <div class="panel mb-3" style="background:linear-gradient(135deg,var(--bg-elevated),#f8fafc);border:1px solid var(--border);">
           <div class="panel-header flex-between flex-wrap gap-2">
@@ -150,15 +175,16 @@
       const interestsEl = document.getElementById('interests-container');
 
       // Settled rather than all: a single failing panel must not blank the dashboard.
-      const [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes] = await Promise.allSettled([
+      const [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes, summaryRes] = await Promise.allSettled([
         apiFetch('/investments/stats'),
         apiFetch('/investments/my'),
         apiFetch('/interest/my'),
         apiFetch('/profile/me'),
-        apiFetch('/distributions/my')
+        apiFetch('/distributions/my'),
+        apiFetch('/distributions/my/summary')
       ]);
 
-      const failures = [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes]
+      const failures = [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes, summaryRes]
         .filter(r => r.status === 'rejected');
       if (failures.length) {
         console.error('Dashboard partial load failure:', failures.map(f => f.reason?.message));
@@ -170,6 +196,7 @@
       const interests = interestsRes.status === 'fulfilled' ? interestsRes.value : [];
       const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
       const profitLedger = ledgerRes.status === 'fulfilled' ? ledgerRes.value : [];
+      const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : null;
 
       try {
         if (profile) {
@@ -183,6 +210,56 @@
           document.getElementById('kpi-active').textContent = stats.activeInvestments;
           document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
           document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
+        }
+
+        // Shares are held per project and profit is credited per project, so a
+        // portfolio-wide share count alone cannot explain the earnings figure.
+        const breakdownEl = document.getElementById('project-breakdown');
+        const holdings = new Map();
+        for (const inv of investments) {
+          if (!['active', 'completed'].includes(inv.status)) continue;
+          const shares = Number(inv.sharesCount) || 0;
+          if (shares <= 0) continue;
+          const pid = inv.projectId || inv.project?._id;
+          const existing = holdings.get(pid);
+          if (existing) {
+            existing.shares += shares;
+          } else {
+            holdings.set(pid, { shares, title: inv.project?.title || 'Project' });
+          }
+        }
+
+        const earnedByProject = new Map(
+          (summary?.perProject || []).map(p => [p.projectId, Number(p.totalProfit) || 0])
+        );
+        const scheduleByProject = new Map(
+          (summary?.upcomingProfits || []).map(s => [s.projectId, s])
+        );
+
+        if (!holdings.size) {
+          breakdownEl.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:18px;"><p>You do not hold shares in any project yet.</p></div></td></tr>`;
+        } else {
+          breakdownEl.innerHTML = Array.from(holdings.entries()).map(([pid, h]) => {
+            const earned = earnedByProject.get(pid) || 0;
+            const sched = scheduleByProject.get(pid);
+            const scheduleCell = sched
+              ? `<span class="inv-status inv-status-active">${escapeHtml(sched.cycleType)} · ${formatMoney(sched.profitPerShare)}/share</span>`
+              : `<span class="inv-status inv-status-pending">Not scheduled yet</span>`;
+            let nextCell = '—';
+            if (sched) {
+              nextCell = sched.dueNow
+                ? '<strong class="text-success">Due today</strong>'
+                : formatDate(sched.nextDueDate);
+            }
+            return `
+              <tr>
+                <td data-label="Project"><strong>${escapeHtml(h.title)}</strong></td>
+                <td data-label="Your Shares">${h.shares.toLocaleString()}</td>
+                <td data-label="Earned So Far" class="text-success"><strong>${formatMoney(earned)}</strong></td>
+                <td data-label="Profit Schedule">${scheduleCell}</td>
+                <td data-label="Next Payout">${nextCell}</td>
+              </tr>`;
+          }).join('');
         }
 
         // Render recent profit distributions

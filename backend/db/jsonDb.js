@@ -1390,6 +1390,71 @@ const DB = {
       if (query.performedBy) data = data.filter(l => l.performedBy === query.performedBy);
       return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
+  },
+
+  adminStats: {
+    getDashboard: async () => {
+      const projects = readCollection('projects');
+      const interests = readCollection('interests');
+      const investors = readCollection('users').filter(u => u.role === 'investor');
+      const investments = readCollection('investments');
+      const withdrawals = readCollection('withdrawals');
+      const distributions = readCollection('distributions');
+      const wallets = readCollection('wallets');
+      const schedules = readCollection('profitSchedules');
+
+      const investedStatuses = ['active', 'completed', 'pending'];
+      const totalInvested = investments
+        .filter(i => investedStatuses.includes(i.status))
+        .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+      const totalShares = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+      const activeInvestments = investments.filter(i => i.status === 'active').length;
+      const investorsWithInvestment = new Set(investments.map(i => i.investorId).filter(Boolean)).size;
+
+      const totalProfitDistributed = distributions
+        .filter(d => d.status === 'completed')
+        .reduce((s, d) => s + (Number(d.totalDistributed) || 0), 0);
+
+      const totalWalletAvailable = wallets.reduce((s, w) => s + (Number(w.availableBalance) || 0), 0);
+      const totalWithdrawn = wallets.reduce((s, w) => s + (Number(w.withdrawnBalance) || 0), 0);
+
+      const pendingList = withdrawals.filter(w => ['pending', 'approved', 'processing'].includes(w.status));
+      const pendingWithdrawalAmount = pendingList.reduce((s, w) => s + (Number(w.amount) || 0), 0);
+
+      const interestStatus = { pending: 0, reviewed: 0, contacted: 0, closed: 0 };
+      interests.forEach((i) => {
+        const s = (i.status || 'pending').toLowerCase();
+        interestStatus[s] = (interestStatus[s] || 0) + 1;
+      });
+
+      const categoryMap = {};
+      projects.forEach((p) => {
+        const key = (p.category || 'Other').split('(')[0].trim() || 'Other';
+        const short = key.length > 22 ? `${key.slice(0, 20)}…` : key;
+        categoryMap[short] = (categoryMap[short] || 0) + 1;
+      });
+
+      return {
+        totalProjects: projects.length,
+        openProjects: projects.filter(p => p.status === 'open').length,
+        totalInvestors: investors.length,
+        activeInvestors: investorsWithInvestment,
+        interestRequests: interests.length,
+        totalInvested,
+        totalShares,
+        activeInvestments,
+        totalProfitDistributed,
+        totalWalletAvailable,
+        totalWithdrawn,
+        pendingWithdrawals: pendingList.length,
+        pendingWithdrawalAmount,
+        activeProfitSchedules: schedules.filter(s => s.status === 'active').length,
+        categoryBreakdown: Object.entries(categoryMap).map(([label, count]) => ({ label, count })),
+        interestStatusBreakdown: Object.entries(interestStatus).map(([label, count]) => ({ label, count }))
+      };
+    }
   }
 };
 

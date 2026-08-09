@@ -10,6 +10,60 @@
     rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .dash-section { margin-bottom: 28px; }
+    .dash-section-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+    .admin-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    .admin-kpi-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .admin-kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+    .admin-kpi-card .ak-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .admin-kpi-card .ak-value {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: var(--navy);
+      margin-top: 6px;
+      font-family: var(--font-en);
+      line-height: 1.2;
+      word-break: break-word;
+    }
+    .admin-kpi-card .ak-hint {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .admin-kpi-card.highlight { border-color: rgba(245, 166, 35, 0.35); background: linear-gradient(135deg, #fff, #fffbf5); }
+    .admin-kpi-card .ak-value.gold { color: var(--gold); }
+    .admin-kpi-card .ak-value.green { color: #10B981; }
+    .admin-kpi-card .ak-value.blue { color: #2563EB; }
+    .admin-kpi-card .ak-value.warn { color: #D97706; }
+  </style>
 </head>
 
 <body>
@@ -55,7 +109,7 @@
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
             <h2>Dashboard Overview</h2>
-            <p>Platform summary of projects and investor interest submissions.</p>
+            <p>Platform-wide investment, investor, and profit summary.</p>
           </div>
         </div>
         <div class="admin-top-actions">
@@ -64,22 +118,86 @@
         </div>
       </div>
 
-      <div class="kpi-grid">
-        <div class="kpi-card">
-          <div class="kpi-label">Total Projects</div>
-          <div class="kpi-value" id="kpi-projects">—</div>
+      <div class="dash-section">
+        <div class="dash-section-title">💰 Investment Overview</div>
+        <div class="admin-kpi-grid">
+          <div class="admin-kpi-card highlight">
+            <div class="ak-label">Total Invested</div>
+            <div class="ak-value gold" id="kpi-total-invested">—</div>
+            <div class="ak-hint">All investor allocations</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Total Investors</div>
+            <div class="ak-value" id="kpi-investors">—</div>
+            <div class="ak-hint">Registered accounts</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Active Investors</div>
+            <div class="ak-value blue" id="kpi-active-investors">—</div>
+            <div class="ak-hint">With at least 1 investment</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Total Shares</div>
+            <div class="ak-value" id="kpi-total-shares">—</div>
+            <div class="ak-hint">Across all projects</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Active Investments</div>
+            <div class="ak-value green" id="kpi-active-investments">—</div>
+            <div class="ak-hint">Currently running</div>
+          </div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Open Projects</div>
-          <div class="kpi-value success" id="kpi-open-projects">—</div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section-title">📊 Profit &amp; Payouts</div>
+        <div class="admin-kpi-grid">
+          <div class="admin-kpi-card highlight">
+            <div class="ak-label">Profit Distributed</div>
+            <div class="ak-value green" id="kpi-profit-distributed">—</div>
+            <div class="ak-hint">Total credited to wallets</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Wallet Available</div>
+            <div class="ak-value" id="kpi-wallet-available">—</div>
+            <div class="ak-hint">Investor withdrawable balance</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Total Withdrawn</div>
+            <div class="ak-value" id="kpi-total-withdrawn">—</div>
+            <div class="ak-hint">Paid to bank/bKash</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Pending Withdrawals</div>
+            <div class="ak-value warn" id="kpi-pending-withdrawals">—</div>
+            <div class="ak-hint" id="kpi-pending-withdrawals-hint">Awaiting processing</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Active Profit Schedules</div>
+            <div class="ak-value blue" id="kpi-profit-schedules">—</div>
+            <div class="ak-hint">Weekly/monthly cycles running</div>
+          </div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Interest Requests</div>
-          <div class="kpi-value accent" id="kpi-interests">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Unique Investors</div>
-          <div class="kpi-value" id="kpi-investors">—</div>
+      </div>
+
+      <div class="dash-section">
+        <div class="dash-section-title">◎ Projects &amp; Leads</div>
+        <div class="admin-kpi-grid">
+          <div class="admin-kpi-card">
+            <div class="ak-label">Total Projects</div>
+            <div class="ak-value" id="kpi-projects">—</div>
+            <div class="ak-hint">All listings</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Open Projects</div>
+            <div class="ak-value green" id="kpi-open-projects">—</div>
+            <div class="ak-hint">Accepting interest</div>
+          </div>
+          <div class="admin-kpi-card">
+            <div class="ak-label">Interest Requests</div>
+            <div class="ak-value gold" id="kpi-interests">—</div>
+            <div class="ak-hint">Express interest leads</div>
+          </div>
         </div>
       </div>
 
@@ -103,7 +221,11 @@
           <h2>Quick Actions</h2>
         </div>
         <div class="panel-body flex gap-2" style="flex-wrap:wrap;">
-          <a href="/admin/projects.html" class="btn">Manage Projects</a>
+          <a href="/admin/investments.html" class="btn">Manage Investments</a>
+          <a href="/admin/investor-list.html" class="btn btn-outline">View Investors</a>
+          <a href="/admin/assign-profit.html" class="btn btn-outline">Assign Profit</a>
+          <a href="/admin/withdrawals.html" class="btn btn-outline">Withdrawals</a>
+          <a href="/admin/projects.html" class="btn btn-outline">Manage Projects</a>
           <a href="/admin/investors.html" class="btn btn-outline">Review Interests</a>
         </div>
       </div>
@@ -249,37 +371,34 @@
       await loadProfitImages();
 
       try {
-        const [projects, interests] = await Promise.all([
-          apiFetch('/projects'),
-          apiFetch('/interest')
-        ]);
+        const stats = await apiFetch('/admin/dashboard-stats');
 
-        document.getElementById('kpi-projects').textContent = projects.length;
-        document.getElementById('kpi-open-projects').textContent =
-          projects.filter((p) => p.status === 'open').length;
-        document.getElementById('kpi-interests').textContent = interests.length;
+        document.getElementById('kpi-total-invested').textContent = formatMoney(stats.totalInvested);
+        document.getElementById('kpi-investors').textContent = stats.totalInvestors;
+        document.getElementById('kpi-active-investors').textContent = stats.activeInvestors;
+        document.getElementById('kpi-total-shares').textContent = Number(stats.totalShares || 0).toLocaleString();
+        document.getElementById('kpi-active-investments').textContent = stats.activeInvestments;
 
-        const investorIds = new Set(
-          interests.map((i) => (i.investor && (i.investor._id || i.investor)) || '').filter(Boolean)
-        );
-        document.getElementById('kpi-investors').textContent = investorIds.size;
+        document.getElementById('kpi-profit-distributed').textContent = formatMoney(stats.totalProfitDistributed);
+        document.getElementById('kpi-wallet-available').textContent = formatMoney(stats.totalWalletAvailable);
+        document.getElementById('kpi-total-withdrawn').textContent = formatMoney(stats.totalWithdrawn);
+        document.getElementById('kpi-pending-withdrawals').textContent = stats.pendingWithdrawals;
+        document.getElementById('kpi-pending-withdrawals-hint').textContent =
+          stats.pendingWithdrawals
+            ? `${formatMoney(stats.pendingWithdrawalAmount)} awaiting processing`
+            : 'No pending requests';
+        document.getElementById('kpi-profit-schedules').textContent = stats.activeProfitSchedules;
 
-        const catMap = {};
-        projects.forEach((p) => {
-          const key = (p.category || 'Other').split('(')[0].trim() || 'Other';
-          const short = key.length > 22 ? key.slice(0, 20) + '…' : key;
-          catMap[short] = (catMap[short] || 0) + 1;
-        });
-        renderBars(
-          document.getElementById('chart-categories'),
-          Object.entries(catMap).map(([label, count]) => ({ label, count }))
-        );
+        document.getElementById('kpi-projects').textContent = stats.totalProjects;
+        document.getElementById('kpi-open-projects').textContent = stats.openProjects;
+        document.getElementById('kpi-interests').textContent = stats.interestRequests;
+
+        renderBars(document.getElementById('chart-categories'), stats.categoryBreakdown || []);
 
         const statusOrder = ['pending', 'reviewed', 'contacted', 'closed'];
         const statusMap = { pending: 0, reviewed: 0, contacted: 0, closed: 0 };
-        interests.forEach((i) => {
-          const s = (i.status || 'pending').toLowerCase();
-          statusMap[s] = (statusMap[s] || 0) + 1;
+        (stats.interestStatusBreakdown || []).forEach((i) => {
+          statusMap[i.label] = i.count;
         });
         const statusEl = document.getElementById('chart-status');
         const maxS = Math.max(...Object.values(statusMap), 1);

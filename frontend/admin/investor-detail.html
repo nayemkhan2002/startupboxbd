@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investor Details — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .investor-hero {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .investor-avatar-lg {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gold), #E8950F);
+      color: var(--navy);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.8rem;
+      flex-shrink: 0;
+    }
+    .investor-meta p {
+      margin: 4px 0;
+      color: var(--text-secondary);
+      font-size: 0.92rem;
+    }
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .badge-active { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+    .badge-suspended { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-profit.html"><span class="nav-icon">📊</span> Assign Profit</a>
+          <a href="/admin/distribution-history.html"><span class="nav-icon">📋</span> Distribution History</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <p style="margin-bottom:6px;"><a href="/admin/investor-list.html" style="color:var(--text-muted);">← Back to Investors</a></p>
+            <h2 id="page-title">Investor Details</h2>
+            <p>Portfolio overview, shares, and project allocations.</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="loading-state" class="panel panel-body">
+        <div class="skeleton skeleton-line lg"></div>
+        <div class="skeleton skeleton-line"></div>
+        <p class="text-muted mt-2">Loading investor details…</p>
+      </div>
+
+      <div id="detail-content" style="display:none;">
+        <div class="panel panel-body investor-hero">
+          <div class="investor-avatar-lg" id="inv-avatar">?</div>
+          <div class="investor-meta" style="flex:1;min-width:220px;">
+            <h2 id="inv-name" style="margin:0 0 6px;color:var(--navy);">—</h2>
+            <p id="inv-email">—</p>
+            <p id="inv-phone">—</p>
+            <p id="inv-joined">—</p>
+            <span class="badge-status badge-active" id="inv-status">Active</span>
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Projects Invested</div>
+            <div class="kpi-value accent" id="kpi-projects">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Total Shares</div>
+            <div class="kpi-value" id="kpi-shares">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Total Invested</div>
+            <div class="kpi-value success" id="kpi-invested">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Active Investments</div>
+            <div class="kpi-value" id="kpi-active">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Return Earned</div>
+            <div class="kpi-value success" id="kpi-earned">—</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Available Balance</div>
+            <div class="kpi-value accent" id="kpi-balance">—</div>
+          </div>
+        </div>
+
+        <div class="panel mt-3">
+          <div class="panel-header">
+            <h2>Project Allocations</h2>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Project</th>
+                  <th>Category</th>
+                  <th>Shares</th>
+                  <th>Amount</th>
+                  <th>ROI</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Start Date</th>
+                </tr>
+              </thead>
+              <tbody id="investments-table">
+                <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      const investorId = new URLSearchParams(window.location.search).get('id');
+      if (!investorId) {
+        showToast('No investor specified', 'error');
+        window.location.href = '/admin/investor-list.html';
+        return;
+      }
+
+      const formatDate = (d) => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      };
+
+      const invStatusClass = (status) => {
+        const s = String(status || 'pending').toLowerCase();
+        if (s === 'active') return 'inv-status inv-status-active';
+        if (s === 'completed') return 'inv-status inv-status-completed';
+        return 'inv-status inv-status-pending';
+      };
+
+      try {
+        const [investor, portfolio, investments] = await Promise.all([
+          apiFetch(`/auth/investors/${investorId}`),
+          apiFetch(`/investments/stats?investorId=${encodeURIComponent(investorId)}`),
+          apiFetch(`/investments/my?investorId=${encodeURIComponent(investorId)}`)
+        ]);
+
+        document.getElementById('loading-state').style.display = 'none';
+        document.getElementById('detail-content').style.display = 'block';
+
+        const isSuspended = investor.accountStatus === 'suspended';
+        document.getElementById('page-title').textContent = investor.name || 'Investor Details';
+        document.getElementById('inv-avatar').textContent = (investor.name || '?').charAt(0).toUpperCase();
+        document.getElementById('inv-name').textContent = investor.name || '—';
+        document.getElementById('inv-email').textContent = investor.email || '—';
+        document.getElementById('inv-phone').textContent = investor.phone ? `Phone: ${investor.phone}` : 'Phone: —';
+        document.getElementById('inv-joined').textContent = investor.createdAt
+          ? `Joined: ${formatDate(investor.createdAt)}`
+          : 'Joined: —';
+
+        const statusEl = document.getElementById('inv-status');
+        statusEl.textContent = isSuspended ? 'Suspended' : 'Active';
+        statusEl.className = `badge-status ${isSuspended ? 'badge-suspended' : 'badge-active'}`;
+
+        if (isSuspended) {
+          document.getElementById('inv-avatar').style.background = 'linear-gradient(135deg, #94a3b8, #64748b)';
+          document.getElementById('inv-avatar').style.color = '#fff';
+        }
+
+        document.getElementById('kpi-projects').textContent = investor.stats?.projectsCount ?? 0;
+        document.getElementById('kpi-shares').textContent = Number(portfolio.totalShares || 0).toLocaleString();
+        document.getElementById('kpi-invested').textContent = formatMoney(portfolio.totalInvested || 0);
+        document.getElementById('kpi-active').textContent = portfolio.activeInvestments ?? 0;
+        document.getElementById('kpi-earned').textContent = formatMoney(portfolio.totalReturnEarned || 0);
+        document.getElementById('kpi-balance').textContent = formatMoney(portfolio.availableBalance || 0);
+
+        const tbody = document.getElementById('investments-table');
+        if (!investments.length) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No investments yet</h3><p>This investor has not been assigned to any projects.</p></div></td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = investments.map((inv) => `
+          <tr>
+            <td data-label="Project"><strong>${escapeHtml(inv.project?.title || 'Deleted Project')}</strong></td>
+            <td data-label="Category">${escapeHtml(inv.project?.category || '—')}</td>
+            <td data-label="Shares" style="font-weight:700;">${Number(inv.sharesCount || 0).toLocaleString()}</td>
+            <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(inv.amount)}</td>
+            <td data-label="ROI">${escapeHtml(String(inv.roi ?? '—'))}${inv.roi != null ? '%' : ''}</td>
+            <td data-label="Duration">${escapeHtml(inv.durationLabel || inv.duration || '—')}</td>
+            <td data-label="Status"><span class="${invStatusClass(inv.status)}">${escapeHtml(inv.status || 'pending')}</span></td>
+            <td data-label="Start Date">${formatDate(inv.startDate)}</td>
+          </tr>`).join('');
+      } catch (err) {
+        document.getElementById('loading-state').innerHTML =
+          `<div class="empty-state"><h3>Unable to load investor</h3><p>${escapeHtml(err.message)}</p><a href="/admin/investor-list.html" class="btn btn-sm mt-2">Back to list</a></div>`;
+        showToast(err.message, 'error');
+      }
+    });
+  </script>
+</body>
+</html>

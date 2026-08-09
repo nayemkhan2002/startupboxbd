@@ -201,6 +201,55 @@ const DB = {
       const list = await User.find({ role: 'investor' }).lean();
       return list.map(stripPassword);
     },
+    listInvestorsWithStats: async () => {
+      const investors = await User.find({ role: 'investor' }).lean();
+      const investments = await Investment.find({}).lean();
+
+      return investors.map((inv) => {
+        const invInvestments = investments.filter(i => i.investorId === inv._id);
+        const projectIds = new Set(invInvestments.map(i => i.projectId).filter(Boolean));
+        const totalShares = invInvestments
+          .filter(i => ['active', 'completed'].includes(i.status))
+          .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+        const totalInvested = invInvestments
+          .filter(i => ['active', 'completed', 'pending'].includes(i.status))
+          .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+        return {
+          ...stripPassword(inv),
+          stats: {
+            projectsCount: projectIds.size,
+            investmentCount: invInvestments.length,
+            totalShares,
+            totalInvested,
+            activeInvestments: invInvestments.filter(i => i.status === 'active').length
+          }
+        };
+      });
+    },
+    getInvestorById: async (id) => {
+      const user = await User.findOne({ _id: id, role: 'investor' }).lean();
+      if (!user) return null;
+      const investments = await Investment.find({ investorId: id }).lean();
+      const projectIds = new Set(investments.map(i => i.projectId).filter(Boolean));
+      const totalShares = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+      const totalInvested = investments
+        .filter(i => ['active', 'completed', 'pending'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+      return {
+        ...stripPassword(user),
+        stats: {
+          projectsCount: projectIds.size,
+          investmentCount: investments.length,
+          totalShares,
+          totalInvested,
+          activeInvestments: investments.filter(i => i.status === 'active').length
+        }
+      };
+    },
     suspendUser: async (id) => {
       const user = await User.findById(id).lean();
       if (!user || user.role === 'admin') return null;

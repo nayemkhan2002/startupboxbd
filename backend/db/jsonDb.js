@@ -253,6 +253,55 @@ const DB = {
         .filter(u => u.role === 'investor')
         .map(stripPassword);
     },
+    listInvestorsWithStats: async () => {
+      const investors = readCollection('users').filter(u => u.role === 'investor');
+      const investments = readCollection('investments');
+
+      return investors.map((inv) => {
+        const invInvestments = investments.filter(i => i.investorId === inv._id);
+        const projectIds = new Set(invInvestments.map(i => i.projectId).filter(Boolean));
+        const totalShares = invInvestments
+          .filter(i => ['active', 'completed'].includes(i.status))
+          .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+        const totalInvested = invInvestments
+          .filter(i => ['active', 'completed', 'pending'].includes(i.status))
+          .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+        return {
+          ...stripPassword(inv),
+          stats: {
+            projectsCount: projectIds.size,
+            investmentCount: invInvestments.length,
+            totalShares,
+            totalInvested,
+            activeInvestments: invInvestments.filter(i => i.status === 'active').length
+          }
+        };
+      });
+    },
+    getInvestorById: async (id) => {
+      const user = readCollection('users').find(u => u._id === id && u.role === 'investor');
+      if (!user) return null;
+      const investments = readCollection('investments').filter(i => i.investorId === id);
+      const projectIds = new Set(investments.map(i => i.projectId).filter(Boolean));
+      const totalShares = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
+      const totalInvested = investments
+        .filter(i => ['active', 'completed', 'pending'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+      return {
+        ...stripPassword(user),
+        stats: {
+          projectsCount: projectIds.size,
+          investmentCount: investments.length,
+          totalShares,
+          totalInvested,
+          activeInvestments: investments.filter(i => i.status === 'active').length
+        }
+      };
+    },
     suspendUser: async (id) => {
       const users = readCollection('users');
       const index = users.findIndex(u => u._id === id);

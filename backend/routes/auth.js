@@ -154,10 +154,20 @@ const { adminOnly } = require('../middleware/adminOnly');
 
 router.get('/investors', protect, adminOnly, async (req, res) => {
   try {
-    const allUsers = await DB.users.find({ role: 'investor' });
-    // Strip password from each user
-    const investors = allUsers.map(({ password, ...rest }) => rest);
+    const investors = await DB.users.listInvestorsWithStats();
     res.json(investors);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.get('/investors/:id', protect, adminOnly, async (req, res) => {
+  try {
+    const investor = await DB.users.getInvestorById(req.params.id);
+    if (!investor) {
+      return res.status(404).json({ message: 'Investor not found' });
+    }
+    res.json(investor);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

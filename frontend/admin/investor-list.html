@@ -133,6 +133,14 @@
           <div class="kpi-label">Joined This Month</div>
           <div class="kpi-value" id="kpi-this-month">—</div>
         </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Shares (All)</div>
+          <div class="kpi-value accent" id="kpi-total-shares">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Invested (All)</div>
+          <div class="kpi-value success" id="kpi-total-invested">—</div>
+        </div>
       </div>
 
       <!-- Search -->
@@ -149,13 +157,16 @@
                 <th>Name</th>
                 <th>Email</th>
                 <th>Phone</th>
+                <th>Projects</th>
+                <th>Shares</th>
+                <th>Invested</th>
                 <th>Status</th>
                 <th>Joined</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="investors-table">
-              <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
+              <tr><td colspan="10"><div class="skeleton skeleton-line"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -190,17 +201,23 @@
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
         document.getElementById('kpi-this-month').textContent = thisMonth.length;
+        document.getElementById('kpi-total-shares').textContent =
+          investors.reduce((sum, inv) => sum + (inv.stats?.totalShares || 0), 0).toLocaleString();
+        document.getElementById('kpi-total-invested').textContent = formatMoney(
+          investors.reduce((sum, inv) => sum + (inv.stats?.totalInvested || 0), 0)
+        );
       };
 
       const render = (list) => {
         const tbody = document.getElementById('investors-table');
         if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
           return;
         }
         tbody.innerHTML = list.map((inv, idx) => {
           const status = inv.accountStatus || 'active';
           const isSuspended = status === 'suspended';
+          const stats = inv.stats || {};
           return `
           <tr class="${isSuspended ? 'investor-row-suspended' : ''}">
             <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
@@ -214,6 +231,9 @@
             </td>
             <td><a href="mailto:${escapeHtml(inv.email)}" style="color:var(--gold);">${escapeHtml(inv.email)}</a></td>
             <td>${escapeHtml(inv.phone || '—')}</td>
+            <td><strong>${stats.projectsCount || 0}</strong><br><small class="text-muted">${stats.investmentCount || 0} allocation${(stats.investmentCount || 0) === 1 ? '' : 's'}</small></td>
+            <td style="font-weight:700;color:var(--navy);">${Number(stats.totalShares || 0).toLocaleString()}</td>
+            <td style="color:var(--gold);font-weight:700;">${formatMoney(stats.totalInvested || 0)}</td>
             <td>
               <span class="badge-status ${isSuspended ? 'badge-suspended' : 'badge-active'}">
                 <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span>
@@ -223,6 +243,7 @@
             <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
             <td>
               <div class="action-btns">
+                <a href="/admin/investor-detail.html?id=${encodeURIComponent(inv._id)}" class="btn btn-sm" title="View full investor details">View</a>
                 <button class="btn ${isSuspended ? 'btn-success-outline' : 'btn-warn'} btn-sm btn-suspend" data-id="${escapeHtml(inv._id)}" title="${isSuspended ? 'Activate this investor' : 'Suspend this investor'}">
                   ${isSuspended ? '✓ Activate' : '⏸ Suspend'}
                 </button>

@@ -30,6 +30,9 @@ router.get('/stats', protect, async (req, res) => {
     if (req.user.role === 'investor' && investorId !== req.user._id) {
       return res.status(403).json({ message: 'Not authorized' });
     }
+    if (req.user.role === 'admin' && !req.query.investorId) {
+      return res.status(400).json({ message: 'investorId query parameter is required for admin' });
+    }
     const stats = await DB.investments.getPortfolioStats(investorId);
     res.json(stats);
   } catch (err) {

@@ -77,32 +77,12 @@ router.get('/', protect, adminOnly, async (req, res) => {
   }
 });
 
-// Admin: Create profit payout
+// Admin: Create profit payout (proof records are auto-created on withdrawal completion)
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { investorId, investmentId, projectId, amount, monthYear, paymentMethod, referenceNo, screenshotUrl, notes, payoutDate } = req.body;
-    if (!investorId || !amount || amount <= 0) {
-      return res.status(400).json({ message: 'investorId and valid amount are required' });
-    }
-
-    const investor = await DB.users.findById(investorId);
-    if (!investor) return res.status(400).json({ message: 'Invalid investor' });
-
-    const payout = await DB.payouts.create({
-      investorId,
-      investmentId: investmentId || '',
-      projectId: projectId || '',
-      amount: Number(amount),
-      monthYear: monthYear || '',
-      paymentMethod: paymentMethod || 'Bank Transfer',
-      referenceNo: referenceNo || '',
-      screenshotUrl: screenshotUrl || '',
-      notes: notes || '',
-      payoutDate: payoutDate || new Date().toISOString()
+    return res.status(400).json({
+      message: 'Manual profit payouts are disabled. Complete a withdrawal request to record transfer proof and debit the investor wallet.'
     });
-
-    const [populated] = await DB.payouts.populateAll([payout]);
-    res.status(201).json(populated);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }

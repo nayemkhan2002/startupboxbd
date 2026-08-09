@@ -3,11 +3,91 @@ const router = express.Router();
 const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
+const {
+  enrichSchedule,
+  processDueCycles,
+  getDueCycleNumbers,
+  getNextDueDate,
+  CYCLE_DAYS
+} = require('../services/profitScheduleService');
 
 const MONTH_NAMES = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+// Process all due scheduled profit cycles (admin)
+router.post('/process-due', protect, adminOnly, async (req, res) => {
+  try {
+    const adminId = req.user.role === 'admin' ? req.user._id : 'system';
+    const processed = await processDueCycles({
+      adminId,
+      scheduleId: req.body.scheduleId || null
+    });
+    res.json({ processed: processed.length, items: processed });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Admin: list profit schedules
+router.get('/schedules', protect, adminOnly, async (req, res) => {
+  try {
+    const query = {};
+    if (req.query.status) query.status = req.query.status;
+    if (req.query.projectId) query.projectId = req.query.projectId;
+    const schedules = await DB.profitSchedules.find(query);
+    const enriched = await Promise.all(schedules.map(enrichSchedule));
+    res.json(enriched);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// Admin: create recurring profit schedule
+router.post('/schedules', protect, adminOnly, async (req, res) => {
+  try {
+    const { projectId, cycleType, profitPerShare, startDate } = req.body;
+    if (!projectId) return res.status(400).json({ message: 'Project is required' });
+    if (!startDate) return res.status(400).json({ message: 'Start date is required' });
+    const pps = Number(profitPerShare);
+    if (!pps || pps <= 0) return res.status(400).json({ message: 'Profit per share must be greater than zero' });
+    if (!['weekly', 'monthly'].includes(cycleType)) {
+      return res.status(400).json({ message: 'Cycle type must be weekly or monthly' });
+    }
+
+    const project = await DB.projects.findById(projectId);
+    if (!project) return res.status(400).json({ message: 'Invalid project' });
+
+    const schedule = await DB.profitSchedules.create({
+      projectId,
+      cycleType,
+      profitPerShare: pps,
+      startDate,
+      createdBy: req.user._id
+    });
+
+    const enriched = await enrichSchedule(schedule);
+    res.status(201).json(enriched);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// Admin: pause or resume schedule
+router.put('/schedules/:id/status', protect, adminOnly, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['active', 'paused'].includes(status)) {
+      return res.status(400).json({ message: 'Status must be active or paused' });
+    }
+    const updated = await DB.profitSchedules.updateStatus(req.params.id, status);
+    if (!updated) return res.status(404).json({ message: 'Schedule not found' });
+    res.json(await enrichSchedule(updated));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 
 // Admin: Preview distribution (no DB write)
 router.post('/preview', protect, adminOnly, async (req, res) => {
@@ -100,6 +180,7 @@ router.get('/my', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
+    await processDueCycles({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
@@ -116,10 +197,34 @@ router.get('/my/summary', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
+    await processDueCycles({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
     const summary = await DB.distributions.getInvestorSummary(investorId);
+
+    const activeSchedules = await DB.profitSchedules.find({ status: 'active' });
+    const upcoming = [];
+    for (const schedule of activeSchedules) {
+      const investments = await DB.investments.find({ investorId, projectId: schedule.projectId });
+      const hasShares = investments.some(i =>
+        ['active', 'completed'].includes(i.status) && (Number(i.sharesCount) || 0) > 0
+      );
+      if (!hasShares) continue;
+      const project = await DB.projects.findById(schedule.projectId);
+      upcoming.push({
+        projectId: schedule.projectId,
+        projectTitle: project ? project.title : 'Project',
+        cycleType: schedule.cycleType,
+        cycleDays: CYCLE_DAYS[schedule.cycleType] || 7,
+        profitPerShare: schedule.profitPerShare,
+        nextDueDate: getNextDueDate(schedule),
+        nextCycleNumber: (schedule.cyclesProcessed || 0) + 1,
+        dueNow: getDueCycleNumbers(schedule).length > 0
+      });
+    }
+    summary.upcomingProfits = upcoming;
+
     res.json(summary);
   } catch (err) {
     res.status(500).json({ message: err.message });

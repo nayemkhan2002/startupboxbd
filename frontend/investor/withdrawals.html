@@ -62,6 +62,7 @@
                   <th>Amount</th>
                   <th>Method</th>
                   <th>Status</th>
+                  <th>Transfer Proof</th>
                   <th>Admin Note</th>
                 </tr>
               </thead>
@@ -193,7 +194,7 @@
 
       const tbody = document.getElementById('withdrawals-table');
       if (!list.length) {
-        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:28px;"><h3>No withdrawal requests</h3><p>Request a payout when you have available earned returns.</p></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:28px;"><h3>No withdrawal requests</h3><p>Request a payout when you have available earned returns.</p></div></td></tr>`;
         return;
       }
       tbody.innerHTML = list.map((w) => `
@@ -203,6 +204,11 @@
           <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(w.amount)}</td>
           <td data-label="Method">${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
           <td data-label="Status"><span class="${wdStatusClass(w.status)}">${escapeHtml(w.status)}</span></td>
+          <td data-label="Transfer Proof">
+            ${w.screenshotUrl
+              ? `<a href="${escapeHtml(w.screenshotUrl)}" target="_blank" class="btn btn-outline btn-sm">View Receipt</a>`
+              : `<small class="text-muted">${w.status === 'completed' ? 'No proof' : '—'}</small>`}
+          </td>
           <td data-label="Admin Note"><small>${escapeHtml(w.adminNote || '—')}</small></td>
         </tr>`).join('');
     };

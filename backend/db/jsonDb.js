@@ -146,6 +146,7 @@ const initDb = async () => {
   readCollection('payouts');
   readCollection('distributions');
   readCollection('profitLedger');
+  readCollection('profitSchedules');
   readCollection('wallets');
   readCollection('auditLog');
 };
@@ -571,19 +572,17 @@ const DB = {
     getPortfolioStats: async (investorId) => {
       const investments = readCollection('investments').filter(i => i.investorId === investorId);
       const withdrawals = readCollection('withdrawals').filter(w => w.investorId === investorId);
+      const wallets = readCollection('wallets');
+      const wallet = wallets.find(w => w.investorId === investorId) || {
+        availableBalance: 0,
+        withdrawnBalance: 0
+      };
 
       const totalInvested = investments
         .filter(i => ['active', 'completed', 'pending'].includes(i.status))
         .reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
       const activeInvestments = investments.filter(i => i.status === 'active').length;
-
-      const totalReturnEarned = investments.reduce((s, i) => {
-        const earned = Number(i.returnEarned) || 0;
-        if (earned > 0) return s + earned;
-        if (i.status === 'completed') return s + (Number(i.expectedReturn) || 0);
-        return s;
-      }, 0);
 
       const expectedReturnActive = investments
         .filter(i => i.status === 'active')
@@ -593,11 +592,10 @@ const DB = {
         .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
-      const reserved = withdrawals
-        .filter(w => ['pending', 'approved', 'processing', 'completed'].includes(w.status))
-        .reduce((s, w) => s + (Number(w.amount) || 0), 0);
-
-      const availableBalance = Math.max(0, totalReturnEarned - reserved);
+      const walletAvailable = Number(wallet.availableBalance) || 0;
+      const walletWithdrawn = Number(wallet.withdrawnBalance) || 0;
+      const availableBalance = Math.max(0, walletAvailable - pendingWithdrawals);
+      const totalReturnEarned = walletAvailable + walletWithdrawn + pendingWithdrawals;
 
       const totalShares = investments
         .filter(i => ['active', 'completed'].includes(i.status))
@@ -646,10 +644,54 @@ const DB = {
       const withdrawals = readCollection('withdrawals');
       const index = withdrawals.findIndex(w => w._id === id);
       if (index === -1) return null;
+
+      const prev = withdrawals[index];
+      const oldStatus = prev.status;
+      const newStatus = updateData.status !== undefined ? updateData.status : oldStatus;
+      const now = new Date().toISOString();
+
+      if (newStatus === 'completed' && oldStatus !== 'completed') {
+        const amt = Number(prev.amount) || 0;
+        const wallets = readCollection('wallets');
+        let wIdx = wallets.findIndex(w => w.investorId === prev.investorId);
+        if (wIdx === -1) {
+          throw new Error('Wallet not found for investor');
+        }
+        const avail = Number(wallets[wIdx].availableBalance) || 0;
+        if (avail < amt) {
+          throw new Error(`Insufficient wallet balance (৳${avail} available, ৳${amt} requested)`);
+        }
+        wallets[wIdx].availableBalance = avail - amt;
+        wallets[wIdx].withdrawnBalance = (Number(wallets[wIdx].withdrawnBalance) || 0) + amt;
+        wallets[wIdx].updatedAt = now;
+        writeCollection('wallets', wallets);
+
+        const payoutList = readCollection('payouts');
+        if (!payoutList.some(p => p.withdrawalId === id)) {
+          payoutList.push({
+            _id: generateId(),
+            investorId: prev.investorId,
+            investmentId: '',
+            projectId: '',
+            withdrawalId: id,
+            amount: amt,
+            monthYear: 'Withdrawal',
+            paymentMethod: prev.method === 'bkash' ? 'bKash' : 'Bank Transfer',
+            referenceNo: updateData.referenceNo || prev.referenceNo || '',
+            screenshotUrl: updateData.screenshotUrl || prev.screenshotUrl || '',
+            notes: updateData.adminNote !== undefined ? updateData.adminNote : (prev.adminNote || ''),
+            payoutDate: now,
+            createdAt: now
+          });
+          writeCollection('payouts', payoutList);
+        }
+        updateData.completedAt = now;
+      }
+
       withdrawals[index] = {
-        ...withdrawals[index],
+        ...prev,
         ...updateData,
-        updatedAt: new Date().toISOString()
+        updatedAt: now
       };
       writeCollection('withdrawals', withdrawals);
       return withdrawals[index];
@@ -685,6 +727,7 @@ const DB = {
         investorId: payload.investorId,
         investmentId: payload.investmentId || '',
         projectId: payload.projectId || '',
+        withdrawalId: payload.withdrawalId || '',
         amount,
         monthYear: payload.monthYear || '',
         paymentMethod: payload.paymentMethod || 'Bank Transfer',
@@ -696,25 +739,6 @@ const DB = {
       };
       payouts.push(newItem);
       writeCollection('payouts', payouts);
-
-      // Increment investment's returnEarned balance
-      if (payload.investmentId) {
-        const investments = readCollection('investments');
-        const idx = investments.findIndex(i => i._id === payload.investmentId);
-        if (idx !== -1) {
-          investments[idx].returnEarned = (Number(investments[idx].returnEarned) || 0) + amount;
-          investments[idx].paymentHistory = investments[idx].paymentHistory || [];
-          investments[idx].paymentHistory.push({
-            type: 'profit_payout',
-            label: `Profit Payout (${payload.monthYear || 'Monthly'})`,
-            amount,
-            date: newItem.payoutDate,
-            screenshotUrl: newItem.screenshotUrl
-          });
-          writeCollection('investments', investments);
-        }
-      }
-
       return newItem;
     },
     findByIdAndDelete: async (id) => {
@@ -723,17 +747,6 @@ const DB = {
       if (!item) return null;
       payouts = payouts.filter(p => p._id !== id);
       writeCollection('payouts', payouts);
-
-      // Decrement investment's returnEarned
-      if (item.investmentId) {
-        const investments = readCollection('investments');
-        const idx = investments.findIndex(i => i._id === item.investmentId);
-        if (idx !== -1) {
-          investments[idx].returnEarned = Math.max(0, (Number(investments[idx].returnEarned) || 0) - Number(item.amount || 0));
-          writeCollection('investments', investments);
-        }
-      }
-
       return item;
     },
     populateAll: async (list) => {
@@ -834,7 +847,7 @@ const DB = {
     confirm: async (projectId, profitPerShare, month, year, adminId, distributionDate) => {
       const distributions = readCollection('distributions');
       const existing = distributions.find(d =>
-        d.projectId === projectId && d.month === month && d.year === year
+        d.projectId === projectId && d.month === month && d.year === year && !d.scheduleId
       );
       if (existing) {
         throw new Error(`Profit already distributed for this project for ${month}/${year}`);
@@ -937,6 +950,140 @@ const DB = {
         performedBy: adminId,
         metadata: {
           distributionId: distribution._id,
+          projectId,
+          profitPerShare,
+          month,
+          year,
+          distributionDate: distributionDate || now,
+          totalInvestors: preview.totalInvestors,
+          totalShares: preview.totalShares,
+          totalDistributed: preview.grandTotal
+        },
+        createdAt: now
+      });
+      writeCollection('auditLog', auditLogs);
+
+      return distribution;
+    },
+
+    confirmScheduledCycle: async (payload) => {
+      const {
+        scheduleId, projectId, profitPerShare, cycleNumber, cycleType,
+        periodStart, periodEnd, month, year, adminId, distributionDate
+      } = payload;
+
+      const distributions = readCollection('distributions');
+      const existing = distributions.find(d =>
+        d.scheduleId === scheduleId && d.cycleNumber === cycleNumber
+      );
+      if (existing) return existing;
+
+      const preview = await DB.distributions.preview(projectId, profitPerShare);
+      if (!preview.investors.length) {
+        throw new Error('No investors with shares found for this project');
+      }
+
+      const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
+      const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
+
+      const distribution = {
+        _id: generateId(),
+        projectId,
+        scheduleId,
+        cycleNumber,
+        cycleType,
+        periodStart,
+        periodEnd,
+        profitPerShare,
+        month,
+        year,
+        totalShares: preview.totalShares,
+        totalInvestors: preview.totalInvestors,
+        totalDistributed: preview.grandTotal,
+        status: 'completed',
+        createdBy: adminId,
+        distributionDate: distributionDate || now,
+        createdAt: now
+      };
+      distributions.push(distribution);
+      writeCollection('distributions', distributions);
+
+      const ledger = readCollection('profitLedger');
+      for (const inv of preview.investors) {
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          ledger.push({
+            _id: generateId(),
+            distributionId: distribution._id,
+            investorId: inv.investorId,
+            projectId,
+            investmentId: invDetail.investmentId,
+            shares: invDetail.shares,
+            profitPerShare,
+            calculatedProfit: profit,
+            month,
+            year,
+            cycleNumber,
+            cycleType,
+            periodStart,
+            periodEnd,
+            createdAt: now
+          });
+        }
+      }
+      writeCollection('profitLedger', ledger);
+
+      const wallets = readCollection('wallets');
+      const investments = readCollection('investments');
+
+      for (const inv of preview.investors) {
+        let walletIdx = wallets.findIndex(w => w.investorId === inv.investorId);
+        if (walletIdx === -1) {
+          wallets.push({
+            _id: generateId(),
+            investorId: inv.investorId,
+            availableBalance: 0,
+            pendingBalance: 0,
+            withdrawnBalance: 0,
+            createdAt: now,
+            updatedAt: now
+          });
+          walletIdx = wallets.length - 1;
+        }
+        wallets[walletIdx].availableBalance = (Number(wallets[walletIdx].availableBalance) || 0) + inv.calculatedProfit;
+        wallets[walletIdx].updatedAt = now;
+
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          const invIdx = investments.findIndex(i => i._id === invDetail.investmentId);
+          if (invIdx !== -1) {
+            investments[invIdx].returnEarned = (Number(investments[invIdx].returnEarned) || 0) + profit;
+            investments[invIdx].profitNotAssigned = false;
+            investments[invIdx].paymentHistory = investments[invIdx].paymentHistory || [];
+            investments[invIdx].paymentHistory.push({
+              type: 'profit_distribution',
+              label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
+              amount: profit,
+              date: now
+            });
+          }
+        }
+      }
+      writeCollection('wallets', wallets);
+      writeCollection('investments', investments);
+
+      const auditLogs = readCollection('auditLog');
+      auditLogs.push({
+        _id: generateId(),
+        action: 'profit_distribution',
+        performedBy: adminId,
+        metadata: {
+          distributionId: distribution._id,
+          scheduleId,
+          cycleNumber,
+          cycleType,
+          periodStart,
+          periodEnd,
           projectId,
           profitPerShare,
           month,
@@ -1114,6 +1261,64 @@ const DB = {
           admin: admin ? { _id: admin._id, name: admin.name, email: admin.email } : null
         };
       });
+    }
+  },
+
+  profitSchedules: {
+    find: async (query = {}) => {
+      let data = readCollection('profitSchedules');
+      if (query.status) data = data.filter(s => s.status === query.status);
+      if (query.projectId) data = data.filter(s => s.projectId === query.projectId);
+      return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+    findById: async (id) => {
+      const data = readCollection('profitSchedules');
+      return data.find(s => s._id === id) || null;
+    },
+    findActiveByProject: async (projectId) => {
+      const data = readCollection('profitSchedules');
+      return data.find(s => s.projectId === projectId && s.status === 'active') || null;
+    },
+    create: async (payload) => {
+      const schedules = readCollection('profitSchedules');
+      const active = schedules.find(s => s.projectId === payload.projectId && s.status === 'active');
+      if (active) {
+        throw new Error('This project already has an active profit schedule. Pause it before creating a new one.');
+      }
+      const now = new Date().toISOString();
+      const schedule = {
+        _id: generateId(),
+        projectId: payload.projectId,
+        cycleType: payload.cycleType === 'monthly' ? 'monthly' : 'weekly',
+        profitPerShare: Number(payload.profitPerShare) || 0,
+        startDate: payload.startDate,
+        status: 'active',
+        cyclesProcessed: 0,
+        createdBy: payload.createdBy,
+        createdAt: now,
+        updatedAt: now
+      };
+      schedules.push(schedule);
+      writeCollection('profitSchedules', schedules);
+      return schedule;
+    },
+    updateStatus: async (id, status) => {
+      const schedules = readCollection('profitSchedules');
+      const idx = schedules.findIndex(s => s._id === id);
+      if (idx === -1) return null;
+      schedules[idx].status = status;
+      schedules[idx].updatedAt = new Date().toISOString();
+      writeCollection('profitSchedules', schedules);
+      return schedules[idx];
+    },
+    incrementCyclesProcessed: async (id) => {
+      const schedules = readCollection('profitSchedules');
+      const idx = schedules.findIndex(s => s._id === id);
+      if (idx === -1) return null;
+      schedules[idx].cyclesProcessed = (schedules[idx].cyclesProcessed || 0) + 1;
+      schedules[idx].updatedAt = new Date().toISOString();
+      writeCollection('profitSchedules', schedules);
+      return schedules[idx];
     }
   },
 

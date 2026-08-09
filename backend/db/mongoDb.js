@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const {
   generateId, User, Project, Interest, Investment, Withdrawal, Payout, ProfitImage,
-  ProfitDistribution, InvestorProfitLedger, AuditLog, Wallet
+  ProfitDistribution, ProfitSchedule, InvestorProfitLedger, AuditLog, Wallet
 } = require('./models');
 
 const stripPassword = (user) => {
@@ -468,19 +468,13 @@ const DB = {
     getPortfolioStats: async (investorId) => {
       const investments = await Investment.find({ investorId }).lean();
       const withdrawals = await Withdrawal.find({ investorId }).lean();
+      const wallet = await Wallet.findOne({ investorId }).lean();
 
       const totalInvested = investments
         .filter(i => ['active', 'completed', 'pending'].includes(i.status))
         .reduce((s, i) => s + (Number(i.amount) || 0), 0);
 
       const activeInvestments = investments.filter(i => i.status === 'active').length;
-
-      const totalReturnEarned = investments.reduce((s, i) => {
-        const earned = Number(i.returnEarned) || 0;
-        if (earned > 0) return s + earned;
-        if (i.status === 'completed') return s + (Number(i.expectedReturn) || 0);
-        return s;
-      }, 0);
 
       const expectedReturnActive = investments
         .filter(i => i.status === 'active')
@@ -490,11 +484,10 @@ const DB = {
         .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
 
-      const reserved = withdrawals
-        .filter(w => ['pending', 'approved', 'processing', 'completed'].includes(w.status))
-        .reduce((s, w) => s + (Number(w.amount) || 0), 0);
-
-      const availableBalance = Math.max(0, totalReturnEarned - reserved);
+      const walletAvailable = wallet ? Number(wallet.availableBalance) || 0 : 0;
+      const walletWithdrawn = wallet ? Number(wallet.withdrawnBalance) || 0 : 0;
+      const availableBalance = Math.max(0, walletAvailable - pendingWithdrawals);
+      const totalReturnEarned = walletAvailable + walletWithdrawn + pendingWithdrawals;
 
       const totalShares = investments
         .filter(i => ['active', 'completed'].includes(i.status))
@@ -533,12 +526,53 @@ const DB = {
       });
       return doc.toObject();
     },
-    findByIdAndUpdate: async (id, updateData) =>
-      Withdrawal.findByIdAndUpdate(
+    findByIdAndUpdate: async (id, updateData) => {
+      const prev = await Withdrawal.findById(id).lean();
+      if (!prev) return null;
+
+      const oldStatus = prev.status;
+      const newStatus = updateData.status !== undefined ? updateData.status : oldStatus;
+      const now = new Date().toISOString();
+
+      if (newStatus === 'completed' && oldStatus !== 'completed') {
+        const amt = Number(prev.amount) || 0;
+        const wallet = await Wallet.findOne({ investorId: prev.investorId }).lean();
+        const avail = wallet ? Number(wallet.availableBalance) || 0 : 0;
+        if (avail < amt) {
+          throw new Error(`Insufficient wallet balance (৳${avail} available, ৳${amt} requested)`);
+        }
+        await Wallet.findOneAndUpdate(
+          { investorId: prev.investorId },
+          {
+            $inc: { availableBalance: -amt, withdrawnBalance: amt },
+            $set: { updatedAt: now }
+          }
+        );
+
+        const existing = await Payout.findOne({ withdrawalId: id }).lean();
+        if (!existing) {
+          await Payout.create({
+            investorId: prev.investorId,
+            withdrawalId: id,
+            amount: amt,
+            monthYear: 'Withdrawal',
+            paymentMethod: prev.method === 'bkash' ? 'bKash' : 'Bank Transfer',
+            referenceNo: updateData.referenceNo || prev.referenceNo || '',
+            screenshotUrl: updateData.screenshotUrl || prev.screenshotUrl || '',
+            notes: updateData.adminNote !== undefined ? updateData.adminNote : (prev.adminNote || ''),
+            payoutDate: now,
+            createdAt: now
+          });
+        }
+        updateData.completedAt = now;
+      }
+
+      return Withdrawal.findByIdAndUpdate(
         id,
-        { $set: { ...updateData, updatedAt: new Date().toISOString() } },
+        { $set: { ...updateData, updatedAt: now } },
         { new: true }
-      ).lean(),
+      ).lean();
+    },
     populateAll: async (list) => {
       if (!list.length) return [];
       const users = await User.find({ _id: { $in: list.map(w => w.investorId) } }).lean();
@@ -573,6 +607,7 @@ const DB = {
         investorId: payload.investorId,
         investmentId: payload.investmentId || '',
         projectId: payload.projectId || '',
+        withdrawalId: payload.withdrawalId || '',
         amount,
         monthYear: payload.monthYear || '',
         paymentMethod: payload.paymentMethod || 'Bank Transfer',
@@ -582,44 +617,11 @@ const DB = {
         payoutDate,
         createdAt: new Date().toISOString()
       });
-
-      // Increment the investment's earned balance safely.
-      if (payload.investmentId) {
-        const invDoc = await Investment.findById(payload.investmentId).lean();
-        const currentEarned = invDoc && typeof invDoc.returnEarned === 'number' ? invDoc.returnEarned : 0;
-        await Investment.updateOne(
-          { _id: payload.investmentId },
-          {
-            $set: { returnEarned: currentEarned + amount },
-            $push: {
-              paymentHistory: {
-                type: 'profit_payout',
-                label: `Profit Payout (${payload.monthYear || 'Monthly'})`,
-                amount,
-                date: payoutDate,
-                screenshotUrl: payload.screenshotUrl || ''
-              }
-            }
-          }
-        );
-      }
       return doc.toObject();
     },
     findByIdAndDelete: async (id) => {
       const item = await Payout.findByIdAndDelete(id).lean();
-      if (!item) return null;
-
-      if (item.investmentId) {
-        const inv = await Investment.findById(item.investmentId).lean();
-        if (inv) {
-          const next = Math.max(0, (Number(inv.returnEarned) || 0) - Number(item.amount || 0));
-          await Investment.updateOne(
-            { _id: item.investmentId },
-            { $set: { returnEarned: next } }
-          );
-        }
-      }
-      return item;
+      return item || null;
     },
     populateAll: async (list) => {
       if (!list.length) return [];
@@ -732,7 +734,9 @@ const DB = {
      */
     confirm: async (projectId, profitPerShare, month, year, adminId, distributionDate) => {
       // Check for duplicates BEFORE starting the transaction
-      const existing = await ProfitDistribution.findOne({ projectId, month, year }).lean();
+      const existing = await ProfitDistribution.findOne({
+        projectId, month, year, scheduleId: { $exists: false }
+      }).lean();
       if (existing) {
         throw new Error(`Profit already distributed for this project for ${month}/${year}`);
       }
@@ -836,6 +840,137 @@ const DB = {
             performedBy: adminId,
             metadata: {
               distributionId: distribution._id,
+              projectId,
+              profitPerShare,
+              month,
+              year,
+              distributionDate: distributionDate || now,
+              totalInvestors: preview.totalInvestors,
+              totalShares: preview.totalShares,
+              totalDistributed: preview.grandTotal
+            },
+            createdAt: now
+          }], { session });
+        });
+      } finally {
+        await session.endSession();
+      }
+
+      return distribution;
+    },
+
+    confirmScheduledCycle: async (payload) => {
+      const {
+        scheduleId, projectId, profitPerShare, cycleNumber, cycleType,
+        periodStart, periodEnd, month, year, adminId, distributionDate
+      } = payload;
+
+      const existing = await ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
+      if (existing) return existing;
+
+      const preview = await DB.distributions.preview(projectId, profitPerShare);
+      if (!preview.investors.length) {
+        throw new Error('No investors with shares found for this project');
+      }
+
+      const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
+      const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
+      const session = await mongoose.startSession();
+      let distribution;
+
+      try {
+        await session.withTransaction(async () => {
+          const [distDoc] = await ProfitDistribution.create([{
+            projectId,
+            scheduleId,
+            cycleNumber,
+            cycleType,
+            periodStart,
+            periodEnd,
+            profitPerShare,
+            month,
+            year,
+            totalShares: preview.totalShares,
+            totalInvestors: preview.totalInvestors,
+            totalDistributed: preview.grandTotal,
+            status: 'completed',
+            createdBy: adminId,
+            distributionDate: distributionDate || now,
+            createdAt: now
+          }], { session });
+          distribution = distDoc.toObject();
+
+          const ledgerDocs = [];
+          for (const inv of preview.investors) {
+            for (const invDetail of inv.investments) {
+              const profit = invDetail.shares * profitPerShare;
+              ledgerDocs.push({
+                distributionId: distribution._id,
+                investorId: inv.investorId,
+                projectId,
+                investmentId: invDetail.investmentId,
+                shares: invDetail.shares,
+                profitPerShare,
+                calculatedProfit: profit,
+                month,
+                year,
+                cycleNumber,
+                cycleType,
+                periodStart,
+                periodEnd,
+                createdAt: now
+              });
+            }
+          }
+          await InvestorProfitLedger.insertMany(ledgerDocs, { session });
+
+          for (const inv of preview.investors) {
+            await Wallet.updateOne(
+              { investorId: inv.investorId },
+              {
+                $inc: { availableBalance: inv.calculatedProfit },
+                $set: { updatedAt: now },
+                $setOnInsert: {
+                  investorId: inv.investorId,
+                  pendingBalance: 0,
+                  withdrawnBalance: 0,
+                  createdAt: now
+                }
+              },
+              { upsert: true, session }
+            );
+
+            for (const invDetail of inv.investments) {
+              const profit = invDetail.shares * profitPerShare;
+              await Investment.updateOne(
+                { _id: invDetail.investmentId },
+                {
+                  $inc: { returnEarned: profit },
+                  $set: { profitNotAssigned: false },
+                  $push: {
+                    paymentHistory: {
+                      type: 'profit_distribution',
+                      label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
+                      amount: profit,
+                      date: now
+                    }
+                  }
+                },
+                { session }
+              );
+            }
+          }
+
+          await AuditLog.create([{
+            action: 'profit_distribution',
+            performedBy: adminId,
+            metadata: {
+              distributionId: distribution._id,
+              scheduleId,
+              cycleNumber,
+              cycleType,
+              periodStart,
+              periodEnd,
               projectId,
               profitPerShare,
               month,
@@ -1023,6 +1158,45 @@ const DB = {
         } : null
       }));
     }
+  },
+
+  profitSchedules: {
+    find: async (query = {}) => {
+      const q = {};
+      if (query.status) q.status = query.status;
+      if (query.projectId) q.projectId = query.projectId;
+      return ProfitSchedule.find(q).sort({ createdAt: -1 }).lean();
+    },
+    findById: async (id) => ProfitSchedule.findById(id).lean(),
+    findActiveByProject: async (projectId) =>
+      ProfitSchedule.findOne({ projectId, status: 'active' }).lean(),
+    create: async (payload) => {
+      const active = await ProfitSchedule.findOne({ projectId: payload.projectId, status: 'active' }).lean();
+      if (active) {
+        throw new Error('This project already has an active profit schedule. Pause it before creating a new one.');
+      }
+      const now = new Date().toISOString();
+      const doc = await ProfitSchedule.create({
+        projectId: payload.projectId,
+        cycleType: payload.cycleType === 'monthly' ? 'monthly' : 'weekly',
+        profitPerShare: Number(payload.profitPerShare) || 0,
+        startDate: payload.startDate,
+        status: 'active',
+        cyclesProcessed: 0,
+        createdBy: payload.createdBy,
+        createdAt: now,
+        updatedAt: now
+      });
+      return doc.toObject();
+    },
+    updateStatus: async (id, status) =>
+      ProfitSchedule.findByIdAndUpdate(id, { $set: { status, updatedAt: new Date().toISOString() } }, { new: true }).lean(),
+    incrementCyclesProcessed: async (id) =>
+      ProfitSchedule.findByIdAndUpdate(
+        id,
+        { $inc: { cyclesProcessed: 1 }, $set: { updatedAt: new Date().toISOString() } },
+        { new: true }
+      ).lean()
   },
 
   wallets: {

@@ -73,17 +73,19 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// Admin: update status / note
+// Admin: update status / note / transfer proof
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const { status, adminNote } = req.body;
+    const { status, adminNote, referenceNo, screenshotUrl } = req.body;
     const allowed = ['pending', 'approved', 'processing', 'completed', 'rejected'];
     if (status && !allowed.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
     const updated = await DB.withdrawals.findByIdAndUpdate(req.params.id, {
       ...(status ? { status } : {}),
-      ...(adminNote !== undefined ? { adminNote } : {})
+      ...(adminNote !== undefined ? { adminNote } : {}),
+      ...(referenceNo !== undefined ? { referenceNo } : {}),
+      ...(screenshotUrl !== undefined ? { screenshotUrl } : {})
     });
     if (!updated) return res.status(404).json({ message: 'Withdrawal not found' });
     const [populated] = await DB.withdrawals.populateAll([updated]);

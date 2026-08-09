@@ -7,7 +7,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
-  <link rel="stylesheet" href="/assets/css/investor.css">
   <style>
     .proof-thumb {
       width: 48px;
@@ -17,6 +16,17 @@
       cursor: pointer;
       border: 1px solid #cbd5e1;
     }
+    .info-banner {
+      background: rgba(59,130,246,0.08);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+    .info-banner strong { color: var(--navy); }
   </style>
 </head>
 <body>
@@ -61,11 +71,17 @@
         <div class="flex gap-2" style="align-items:flex-start;">
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
-            <h2>Profit Payouts</h2>
-            <p>Record monthly profit transfers to investors and attach bank transfer receipts.</p>
+            <h2>Transfer Receipts</h2>
+            <p>Proof of bank/bKash transfers created when withdrawals are completed.</p>
           </div>
         </div>
-        <button class="btn" id="add-payout-btn">+ Record Profit Payout</button>
+        <a href="/admin/withdrawals.html" class="btn btn-outline btn-sm">Manage Withdrawals</a>
+      </div>
+
+      <div class="info-banner">
+        <strong>How it works:</strong> Profit is credited automatically via <a href="/admin/assign-profit.html">Assign Profit</a> schedules.
+        When investors request a withdrawal, complete it on the <a href="/admin/withdrawals.html">Withdrawals</a> page with transfer proof.
+        Receipts appear here automatically — no manual profit entry needed.
       </div>
 
       <div class="panel">
@@ -75,16 +91,15 @@
               <tr>
                 <th>Date</th>
                 <th>Investor</th>
-                <th>Project</th>
                 <th>Amount</th>
-                <th>Period</th>
+                <th>Type</th>
                 <th>Method / Ref</th>
                 <th>Transfer Proof</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody id="payouts-table">
-              <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+              <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -92,99 +107,23 @@
     </main>
   </div>
 
-  <!-- Submit Payout Modal -->
-  <div class="modal" id="payout-modal">
-    <div class="modal-content" style="max-width:560px;">
-      <h3 id="modal-title" style="margin-bottom:18px;">Record Profit Payout</h3>
-      <div id="error-msg" class="error-msg"></div>
-      <form id="payout-form">
-        <input type="hidden" id="screenshot-url">
-
-        <div class="form-group">
-          <label>Investor Profile</label>
-          <select id="investorId" class="form-control" required></select>
-        </div>
-
-        <div class="form-group">
-          <label>Project / Investment</label>
-          <select id="investmentId" class="form-control" required></select>
-        </div>
-
-        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:140px;">
-            <label>Profit Amount (৳)</label>
-            <input type="number" id="amount" class="form-control" required min="1" placeholder="e.g. 5000">
-          </div>
-          <div style="flex:1;min-width:140px;">
-            <label>Month / Period</label>
-            <input type="text" id="monthYear" class="form-control" required placeholder="e.g. July 2026">
-          </div>
-        </div>
-
-        <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:140px;">
-            <label>Payment Method</label>
-            <select id="paymentMethod" class="form-control">
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="bKash">bKash</option>
-              <option value="Nagad">Nagad</option>
-              <option value="Cash">Cash</option>
-            </select>
-          </div>
-          <div style="flex:1;min-width:140px;">
-            <label>Payout Date</label>
-            <input type="date" id="payoutDate" class="form-control" required>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Bank Reference / TxID</label>
-          <input type="text" id="referenceNo" class="form-control" placeholder="e.g. TRX98273619283">
-        </div>
-
-        <div class="form-group">
-          <label>Bank Transfer Screenshot (Proof of Payment)</label>
-          <input type="file" id="screenshot-input" class="form-control" accept="image/*,.pdf">
-          <div class="image-preview-box mt-1" id="preview-box" style="height:100px;">
-            <span class="text-muted" id="preview-placeholder">No receipt image uploaded</span>
-            <img id="preview-img" style="max-height:90px;" alt="Receipt Preview">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Admin Notes (optional)</label>
-          <textarea id="notes" class="form-control" rows="2" placeholder="e.g. July profit share credited to Dutch-Bangla Bank account."></textarea>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end;gap:10px;">
-          <button type="button" class="btn btn-outline" id="cancel-btn">Cancel</button>
-          <button type="submit" class="btn" id="save-btn">Submit Payout</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/investor.js"></script>
   <script>
-    let allPayouts = [];
-    let allInvestments = [];
-
     const loadTable = async () => {
       const tbody = document.getElementById('payouts-table');
       try {
-        allPayouts = await apiFetch('/payouts');
+        const allPayouts = await apiFetch('/payouts');
         if (!allPayouts.length) {
-          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No profit payouts recorded</h3><p>Click "+ Record Profit Payout" above to submit monthly profit proof.</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No transfer receipts yet</h3><p>Complete a withdrawal request with payment proof to create a receipt.</p></div></td></tr>`;
           return;
         }
         tbody.innerHTML = allPayouts.map((p) => `
           <tr>
             <td>${formatDate(p.payoutDate)}</td>
             <td><strong>${escapeHtml(p.investor?.name || '—')}</strong><br><small class="text-muted">${escapeHtml(p.investor?.email || '')}</small></td>
-            <td>${escapeHtml(p.project?.title || '—')}</td>
             <td class="text-success"><strong>${formatMoney(p.amount)}</strong></td>
-            <td><span class="badge">${escapeHtml(p.monthYear || 'Monthly')}</span></td>
+            <td><span class="badge">${escapeHtml(p.withdrawalId ? 'Withdrawal' : (p.monthYear || 'Transfer'))}</span></td>
             <td>${escapeHtml(p.paymentMethod || 'Bank')}<br><small class="text-muted">${escapeHtml(p.referenceNo || '')}</small></td>
             <td>
               ${p.screenshotUrl
@@ -196,7 +135,7 @@
             </td>
           </tr>`).join('');
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>Failed to load payouts</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>Failed to load receipts</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
         showToast(err.message, 'error');
       }
     };
@@ -211,126 +150,19 @@
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.admin-sidebar');
 
-      const modal = document.getElementById('payout-modal');
-      const form = document.getElementById('payout-form');
-      const screenshotInput = document.getElementById('screenshot-input');
-      const previewImg = document.getElementById('preview-img');
-      const previewPlaceholder = document.getElementById('preview-placeholder');
-
-      screenshotInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          previewImg.src = ev.target.result;
-          previewImg.style.display = 'block';
-          previewPlaceholder.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-      });
-
-      try {
-        const [investors, investments] = await Promise.all([
-          apiFetch('/profile/investors'),
-          apiFetch('/investments')
-        ]);
-        allInvestments = investments;
-
-        document.getElementById('investorId').innerHTML =
-          `<option value="">Select investor profile</option>` +
-          investors.map((i) => `<option value="${escapeHtml(i._id)}">${escapeHtml(i.name)} (${escapeHtml(i.email)})</option>`).join('');
-
-        document.getElementById('investorId').addEventListener('change', (e) => {
-          const selectedInvestorId = e.target.value;
-          const userInvestments = allInvestments.filter(i => i.investorId === selectedInvestorId);
-          document.getElementById('investmentId').innerHTML =
-            `<option value="">Select project investment</option>` +
-            userInvestments.map(i => `<option value="${escapeHtml(i._id)}" data-project="${escapeHtml(i.projectId || '')}">${escapeHtml(i.project?.title || 'Investment')} — ${formatMoney(i.amount)}</option>`).join('');
-        });
-      } catch (err) {
-        showToast(err.message, 'error');
-      }
-
-      const now = new Date();
-      const currentMonthYear = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-      document.getElementById('monthYear').value = currentMonthYear;
-      document.getElementById('payoutDate').value = now.toISOString().slice(0, 10);
-
       await loadTable();
-
-      document.getElementById('add-payout-btn').addEventListener('click', () => {
-        form.reset();
-        document.getElementById('screenshot-url').value = '';
-        previewImg.style.display = 'none';
-        previewPlaceholder.style.display = 'block';
-        document.getElementById('monthYear').value = currentMonthYear;
-        document.getElementById('payoutDate').value = new Date().toISOString().slice(0, 10);
-        document.getElementById('error-msg').style.display = 'none';
-        modal.style.display = 'block';
-      });
-
-      document.getElementById('cancel-btn').addEventListener('click', () => { modal.style.display = 'none'; });
-      modal.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
 
       document.getElementById('payouts-table').addEventListener('click', async (e) => {
         const deleteBtn = e.target.closest('.delete-btn');
-        if (deleteBtn) {
-          const ok = await confirmDialog('Delete this payout record? This will adjust the investor return balance.', { title: 'Delete Payout?', danger: true, confirmText: 'Delete' });
-          if (!ok) return;
-          try {
-            await apiFetch(`/payouts/${deleteBtn.dataset.id}`, { method: 'DELETE' });
-            showToast('Payout record deleted', 'success');
-            loadTable();
-          } catch (err) {
-            showToast(err.message, 'error');
-          }
-        }
-      });
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('save-btn');
-        const errorDiv = document.getElementById('error-msg');
-        const investmentSelect = document.getElementById('investmentId');
-        const selectedOpt = investmentSelect.options[investmentSelect.selectedIndex];
-        const projectId = selectedOpt ? selectedOpt.getAttribute('data-project') : '';
-
+        if (!deleteBtn) return;
+        const ok = await confirmDialog('Delete this receipt record? The withdrawal will remain completed.', { title: 'Delete Receipt?', danger: true, confirmText: 'Delete' });
+        if (!ok) return;
         try {
-          btn.disabled = true;
-          btn.textContent = 'Saving…';
-          errorDiv.style.display = 'none';
-
-          let screenshotUrl = '';
-          if (screenshotInput.files.length > 0) {
-            const formData = new FormData();
-            formData.append('screenshot', screenshotInput.files[0]);
-            const uploadRes = await apiFetch('/payouts/upload', { method: 'POST', body: formData });
-            screenshotUrl = uploadRes.screenshotUrl;
-          }
-
-          const body = {
-            investorId: document.getElementById('investorId').value,
-            investmentId: investmentSelect.value,
-            projectId,
-            amount: Number(document.getElementById('amount').value),
-            monthYear: document.getElementById('monthYear').value,
-            paymentMethod: document.getElementById('paymentMethod').value,
-            payoutDate: document.getElementById('payoutDate').value,
-            referenceNo: document.getElementById('referenceNo').value,
-            screenshotUrl,
-            notes: document.getElementById('notes').value
-          };
-
-          await apiFetch('/payouts', { method: 'POST', body: JSON.stringify(body) });
-          showToast('Profit payout recorded & receipt attached', 'success');
-          modal.style.display = 'none';
+          await apiFetch(`/payouts/${deleteBtn.dataset.id}`, { method: 'DELETE' });
+          showToast('Receipt deleted', 'success');
           loadTable();
         } catch (err) {
-          errorDiv.textContent = err.message;
-          errorDiv.style.display = 'block';
-        } finally {
-          btn.disabled = false;
-          btn.textContent = 'Submit Payout';
+          showToast(err.message, 'error');
         }
       });
     });

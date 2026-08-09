@@ -91,12 +91,15 @@
             <p>Distribute project profits to investors based on their share ownership.</p>
           </div>
         </div>
-        <a href="/admin/distribution-history.html" class="btn btn-outline btn-sm">View History</a>
+        <div class="admin-top-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-outline btn-sm" id="process-due-btn">⚡ Process Due Profits</button>
+          <a href="/admin/distribution-history.html" class="btn btn-outline btn-sm">View History</a>
+        </div>
       </div>
 
-      <!-- Distribution Form -->
       <div class="dist-form-card" id="dist-form-card">
-        <h3>📊 New Profit Distribution</h3>
+        <h3>📊 Start Recurring Profit Schedule</h3>
+        <p style="font-size:0.88rem;color:var(--text-muted);margin:-8px 0 18px;">Set a project, profit per share, and start date. Profit auto-credits every <strong>7 days</strong> (weekly) or <strong>30 days</strong> (monthly) based on investor shares.</p>
         <div class="dist-form-row">
           <div class="form-group">
             <label for="projectId">Select Project</label>
@@ -105,50 +108,52 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="profitPerShare">Profit Per Share (৳)</label>
-            <input type="number" id="profitPerShare" min="1" step="any" placeholder="e.g. 500" required>
-          </div>
-        </div>
-        <div class="dist-form-row">
-          <div class="form-group">
-            <label for="distMonth">Distribution Month</label>
-            <select id="distMonth" required>
-              <option value="">— Select month —</option>
-              <option value="1">January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
+            <label for="cycleType">Profit Cycle</label>
+            <select id="cycleType" required>
+              <option value="weekly">Weekly (every 7 days)</option>
+              <option value="monthly">Monthly (every 30 days)</option>
             </select>
           </div>
-          <div class="form-group">
-            <label for="distYear">Distribution Year</label>
-            <select id="distYear" required></select>
-          </div>
         </div>
         <div class="dist-form-row">
           <div class="form-group">
-            <label for="distDate">Distribution Start Date</label>
-            <input type="date" id="distDate" required>
+            <label for="profitPerShare">Profit Per Share (৳)</label>
+            <input type="number" id="profitPerShare" min="1" step="any" placeholder="e.g. 350" required>
           </div>
-          <div class="form-group" style="display:flex;align-items:flex-end;">
-            <p style="font-size:0.8rem;color:var(--text-muted);margin:0;line-height:1.5;">📅 Select the start date when this weekly profit begins for investors.</p>
+          <div class="form-group">
+            <label for="distDate">Cycle Start Date</label>
+            <input type="date" id="distDate" required>
           </div>
         </div>
         <div class="dist-actions">
-          <button type="button" class="btn-preview" id="preview-btn">Preview Distribution</button>
-          <button type="button" class="btn-confirm" id="confirm-btn" disabled>Confirm Distribution</button>
+          <button type="button" class="btn-confirm" id="start-schedule-btn">Start Schedule</button>
+          <button type="button" class="btn-preview" id="preview-btn">Preview First Cycle</button>
         </div>
       </div>
 
-      <!-- Preview Section -->
+      <div class="dist-form-card" id="schedules-panel">
+        <h3>🔄 Active Profit Schedules</h3>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Cycle</th>
+                <th>Profit/Share</th>
+                <th>Start Date</th>
+                <th>Cycles Done</th>
+                <th>Next Payout</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="schedules-table">
+              <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="preview-section" id="preview-section">
         <div class="preview-header">
           <h3>Distribution Preview</h3>
@@ -188,20 +193,8 @@
     </main>
   </div>
 
-  <!-- Confirmation Modal -->
-  <div class="confirm-overlay" id="confirm-overlay">
-    <div class="confirm-box">
-      <h3>⚡ Confirm Profit Distribution</h3>
-      <p>You are about to distribute profits to all investors in this project. This action cannot be undone.</p>
-      <div class="confirm-detail" id="confirm-detail"></div>
-      <div class="confirm-btns">
-        <button type="button" class="btn btn-outline" id="confirm-cancel">Cancel</button>
-        <button type="button" class="btn-confirm" id="confirm-execute">
-          Confirm &amp; Distribute
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Confirmation Modal (preview only) -->
+  <div class="confirm-overlay" id="confirm-overlay" style="display:none;"></div>
 
   <style>
     .audit-log-panel{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:0;box-shadow:var(--shadow-sm);margin-top:24px;overflow:hidden;}
@@ -228,6 +221,9 @@
     .audit-footer-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;flex-wrap:wrap;gap:8px;}
     .btn-delete-audit{background:rgba(239,68,68,0.1);color:#DC2626;border:1px solid rgba(239,68,68,0.25);padding:4px 12px;border-radius:14px;font-size:0.78rem;font-weight:700;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:4px;}
     .btn-delete-audit:hover{background:#DC2626;color:#fff;border-color:#DC2626;box-shadow:0 2px 8px rgba(220,38,38,0.25);}
+    .badge-status{display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:700;text-transform:capitalize;}
+    .badge-active{background:rgba(46,204,113,0.12);color:#2ecc71;}
+    .badge-suspended{background:rgba(148,163,184,0.2);color:#64748b;}
   </style>
 
   <script src="/assets/js/api.js"></script>
@@ -235,91 +231,106 @@
     const MONTH_NAMES = ['','January','February','March','April','May','June','July','August','September','October','November','December'];
     let previewData = null;
 
-    // Delete audit log / distribution record
+    const formatDisplayDate = (d) => {
+      if (!d) return '—';
+      const dt = new Date(d);
+      return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    };
+
     async function deleteAuditLog(id, title) {
-      if (!confirm(`Are you sure you want to delete this profit distribution for "${title}"?\nThis will revert investor balances and delete this distribution record.`)) {
-        return;
-      }
+      if (!confirm(`Delete profit distribution for "${title}"? This reverts investor balances.`)) return;
       try {
         await apiFetch(`/distributions/audit-log/${id}`, { method: 'DELETE' });
-        showToast(`🗑️ Distribution for "${title}" deleted successfully`, 'success');
+        showToast(`Distribution for "${title}" deleted`, 'success');
         await loadAuditLog();
       } catch (err) {
         showToast(err.message, 'error');
       }
     }
 
-    // Load and render audit log
     async function loadAuditLog() {
       const body = document.getElementById('audit-log-body');
       const countEl = document.getElementById('audit-count');
       try {
         const logs = await apiFetch('/distributions/audit-log');
         countEl.textContent = `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`;
-
         if (!logs.length) {
-          body.innerHTML = `<div class="empty-state" style="padding:32px;text-align:center;">
-            <div style="font-size:2rem;margin-bottom:8px;">📋</div>
-            <h3 style="color:var(--navy);font-size:1rem;">No distributions yet</h3>
-            <p class="text-muted" style="font-size:0.88rem;">When you distribute profits, they will appear here as an audit trail.</p>
-          </div>`;
+          body.innerHTML = `<div class="empty-state" style="padding:32px;text-align:center;"><h3>No distributions yet</h3><p class="text-muted">Completed profit cycles appear here.</p></div>`;
           return;
         }
-
         body.innerHTML = `<div class="audit-timeline">${logs.map(log => {
           const m = log.metadata || {};
           const d = new Date(log.createdAt);
-          const dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-          const timeStr = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-          const period = m.month && m.year ? `${MONTH_NAMES[m.month]} ${m.year}` : '—';
-          const startDateStr = m.distributionDate ? new Date(m.distributionDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
           const pTitle = log.projectTitle || 'Project';
-
+          const cycleInfo = m.cycleNumber ? `${m.cycleType === 'monthly' ? 'Monthly' : 'Weekly'} Cycle #${m.cycleNumber}` : `${MONTH_NAMES[m.month] || ''} ${m.year || ''}`;
           return `
             <div class="audit-entry">
               <div class="audit-entry-header">
-                <span class="audit-entry-title">${escapeHtml(pTitle)}</span>
-                <span class="audit-entry-time">${dateStr} · ${timeStr}</span>
+                <span class="audit-entry-title">${escapeHtml(pTitle)} — ${escapeHtml(cycleInfo)}</span>
+                <span class="audit-entry-time">${formatDisplayDate(log.createdAt)}</span>
               </div>
               <div class="audit-entry-details">
-                <div class="audit-detail-item">
-                  <span class="adl">Start Date</span>
-                  <span class="adv">${escapeHtml(startDateStr)}</span>
-                </div>
-                <div class="audit-detail-item">
-                  <span class="adl">Period</span>
-                  <span class="adv">${escapeHtml(period)}</span>
-                </div>
-                <div class="audit-detail-item">
-                  <span class="adl">Profit/Share</span>
-                  <span class="adv accent">${formatMoney(m.profitPerShare || 0)}</span>
-                </div>
-                <div class="audit-detail-item">
-                  <span class="adl">Investors</span>
-                  <span class="adv">${m.totalInvestors || 0}</span>
-                </div>
-                <div class="audit-detail-item">
-                  <span class="adl">Total Shares</span>
-                  <span class="adv">${Number(m.totalShares || 0).toLocaleString()}</span>
-                </div>
-                <div class="audit-detail-item">
-                  <span class="adl">Total Distributed</span>
-                  <span class="adv green">${formatMoney(m.totalDistributed || 0)}</span>
-                </div>
+                <div class="audit-detail-item"><span class="adl">Period</span><span class="adv">${escapeHtml(m.periodStart || '—')} → ${escapeHtml(m.periodEnd || '—')}</span></div>
+                <div class="audit-detail-item"><span class="adl">Profit/Share</span><span class="adv accent">${formatMoney(m.profitPerShare || 0)}</span></div>
+                <div class="audit-detail-item"><span class="adl">Investors</span><span class="adv">${m.totalInvestors || 0}</span></div>
+                <div class="audit-detail-item"><span class="adl">Total Distributed</span><span class="adv green">${formatMoney(m.totalDistributed || 0)}</span></div>
               </div>
               <div class="audit-footer-row">
-                <div class="audit-admin-tag">
-                  <span class="admin-icon">🛡️</span> By ${escapeHtml(log.adminName || 'Admin')}
-                </div>
-                <button type="button" class="btn-delete-audit" onclick="deleteAuditLog('${log._id}', '${escapeHtml(pTitle).replace(/'/g, "\\'")}')">
-                  🗑️ Delete Distribution
-                </button>
+                <div class="audit-admin-tag"><span class="admin-icon">🛡️</span> By ${escapeHtml(log.adminName || 'Admin')}</div>
+                <button type="button" class="btn-delete-audit" onclick="deleteAuditLog('${log._id}', '${escapeHtml(pTitle).replace(/'/g, "\\'")}')">🗑️ Delete</button>
               </div>
             </div>`;
         }).join('')}</div>`;
       } catch (err) {
-        body.innerHTML = `<div class="empty-state" style="padding:24px;"><p class="text-muted">${escapeHtml(err.message)}</p></div>`;
+        body.innerHTML = `<div class="empty-state"><p class="text-muted">${escapeHtml(err.message)}</p></div>`;
       }
+    }
+
+    async function loadSchedules() {
+      const tbody = document.getElementById('schedules-table');
+      try {
+        const schedules = await apiFetch('/distributions/schedules');
+        if (!schedules.length) {
+          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No schedules yet</h3><p>Start a recurring profit schedule above.</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = schedules.map(s => {
+          const dueBadge = s.dueCyclesCount > 0
+            ? `<span style="color:#10B981;font-weight:700;">${s.dueCyclesCount} due now</span>`
+            : `<span class="text-muted">${formatDisplayDate(s.nextDueDate)}</span>`;
+          return `
+            <tr>
+              <td><strong>${escapeHtml(s.project?.title || 'Project')}</strong></td>
+              <td>${s.cycleType === 'monthly' ? 'Monthly (30d)' : 'Weekly (7d)'}</td>
+              <td style="color:var(--gold);font-weight:700;">${formatMoney(s.profitPerShare)}</td>
+              <td>${formatDisplayDate(s.startDate)}</td>
+              <td>${s.cyclesProcessed || 0}</td>
+              <td>${dueBadge}</td>
+              <td><span class="badge-status ${s.status === 'active' ? 'badge-active' : 'badge-suspended'}">${escapeHtml(s.status)}</span></td>
+              <td>
+                <div class="action-btns" style="display:flex;gap:6px;flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm btn-process-schedule" data-id="${escapeHtml(s._id)}">Process</button>
+                  <button type="button" class="btn btn-sm btn-toggle-schedule" data-id="${escapeHtml(s._id)}" data-status="${escapeHtml(s.status)}">${s.status === 'active' ? 'Pause' : 'Resume'}</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    }
+
+    async function processDue(scheduleId = null) {
+      const result = await apiFetch('/distributions/process-due', {
+        method: 'POST',
+        body: JSON.stringify(scheduleId ? { scheduleId } : {})
+      });
+      if (result.processed > 0) {
+        showToast(`✅ Processed ${result.processed} profit cycle(s)`, 'success');
+      } else {
+        showToast('No profit cycles are due yet', 'info');
+      }
+      await Promise.all([loadSchedules(), loadAuditLog()]);
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -332,23 +343,8 @@
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.admin-sidebar');
 
-      // Populate year dropdown
-      const yearSelect = document.getElementById('distYear');
-      const currentYear = new Date().getFullYear();
-      for (let y = currentYear + 1; y >= 2024; y--) {
-        const opt = document.createElement('option');
-        opt.value = y;
-        opt.textContent = y;
-        if (y === currentYear) opt.selected = true;
-        yearSelect.appendChild(opt);
-      }
+      document.getElementById('distDate').value = new Date().toISOString().split('T')[0];
 
-      // Set current month and default date
-      document.getElementById('distMonth').value = new Date().getMonth() + 1;
-      const todayIso = new Date().toISOString().split('T')[0];
-      document.getElementById('distDate').value = todayIso;
-
-      // Load projects
       try {
         const projects = await apiFetch('/projects');
         const projectSelect = document.getElementById('projectId');
@@ -362,48 +358,69 @@
         showToast(err.message, 'error');
       }
 
-      // Load audit log
+      await processDue();
+      await loadSchedules();
       await loadAuditLog();
 
-      // Preview button
+      document.getElementById('process-due-btn').addEventListener('click', async () => {
+        const btn = document.getElementById('process-due-btn');
+        btn.disabled = true;
+        try { await processDue(); } catch (err) { showToast(err.message, 'error'); }
+        btn.disabled = false;
+      });
+
+      document.getElementById('start-schedule-btn').addEventListener('click', async () => {
+        const projectId = document.getElementById('projectId').value;
+        const cycleType = document.getElementById('cycleType').value;
+        const profitPerShare = Number(document.getElementById('profitPerShare').value);
+        const startDate = document.getElementById('distDate').value;
+        if (!projectId) return showToast('Please select a project', 'error');
+        if (!profitPerShare || profitPerShare <= 0) return showToast('Profit per share must be greater than zero', 'error');
+        if (!startDate) return showToast('Please select a start date', 'error');
+
+        const btn = document.getElementById('start-schedule-btn');
+        btn.disabled = true;
+        try {
+          await apiFetch('/distributions/schedules', {
+            method: 'POST',
+            body: JSON.stringify({ projectId, cycleType, profitPerShare, startDate })
+          });
+          showToast('Recurring profit schedule started', 'success');
+          await loadSchedules();
+        } catch (err) {
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
       document.getElementById('preview-btn').addEventListener('click', async () => {
         const projectId = document.getElementById('projectId').value;
         const profitPerShare = Number(document.getElementById('profitPerShare').value);
-        const month = document.getElementById('distMonth').value;
-        const year = document.getElementById('distYear').value;
-        const distDate = document.getElementById('distDate').value;
-
-        if (!projectId) return showToast('Please select a project', 'error');
-        if (!profitPerShare || profitPerShare <= 0) return showToast('Profit per share must be greater than zero', 'error');
-        if (!month) return showToast('Please select a month', 'error');
-        if (!year) return showToast('Please select a year', 'error');
-        if (!distDate) return showToast('Please select a distribution start date', 'error');
+        const cycleType = document.getElementById('cycleType').value;
+        const startDate = document.getElementById('distDate').value;
+        if (!projectId || !profitPerShare) return showToast('Select project and profit per share', 'error');
 
         const btn = document.getElementById('preview-btn');
         btn.disabled = true;
-        btn.textContent = 'Loading…';
-
         try {
           previewData = await apiFetch('/distributions/preview', {
             method: 'POST',
             body: JSON.stringify({ projectId, profitPerShare })
           });
-
           const previewSection = document.getElementById('preview-section');
           const tbody = document.getElementById('preview-table');
           const summaryEl = document.getElementById('preview-summary');
 
-          if (!previewData.investors || !previewData.investors.length) {
-            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No investors found</h3><p>No investors have shares in this project.</p></div></td></tr>`;
+          if (!previewData.investors?.length) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><h3>No investors with shares</h3></div></td></tr>`;
             summaryEl.innerHTML = '';
             previewSection.classList.add('visible');
-            document.getElementById('confirm-btn').disabled = true;
             return;
           }
 
-          const formattedDistDate = new Date(distDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
           document.getElementById('preview-project-badge').textContent =
-            `${previewData.project?.title || 'Project'} — Start Date: ${formattedDistDate} (${MONTH_NAMES[Number(month)]} ${year})`;
+            `${previewData.project?.title || 'Project'} — ${cycleType} from ${formatDisplayDate(startDate)}`;
 
           tbody.innerHTML = previewData.investors.map((inv, i) => `
             <tr>
@@ -413,107 +430,40 @@
               <td><strong>${Number(inv.totalShares).toLocaleString()}</strong></td>
               <td>${formatMoney(inv.profitPerShare)}</td>
               <td class="text-success"><strong>${formatMoney(inv.calculatedProfit)}</strong></td>
-            </tr>
-          `).join('');
+            </tr>`).join('');
 
           summaryEl.innerHTML = `
-            <div class="summary-card">
-              <div class="sc-label">Total Investors</div>
-              <div class="sc-value accent">${previewData.totalInvestors}</div>
-            </div>
-            <div class="summary-card">
-              <div class="sc-label">Total Shares</div>
-              <div class="sc-value">${Number(previewData.totalShares).toLocaleString()}</div>
-            </div>
-            <div class="summary-card">
-              <div class="sc-label">Profit Per Share</div>
-              <div class="sc-value">${formatMoney(profitPerShare)}</div>
-            </div>
-            <div class="summary-card">
-              <div class="sc-label">Grand Total</div>
-              <div class="sc-value success">${formatMoney(previewData.grandTotal)}</div>
-            </div>
-          `;
-
+            <div class="summary-card"><div class="sc-label">Investors</div><div class="sc-value accent">${previewData.totalInvestors}</div></div>
+            <div class="summary-card"><div class="sc-label">Total Shares</div><div class="sc-value">${Number(previewData.totalShares).toLocaleString()}</div></div>
+            <div class="summary-card"><div class="sc-label">Per Cycle Total</div><div class="sc-value success">${formatMoney(previewData.grandTotal)}</div></div>`;
           previewSection.classList.add('visible');
-          document.getElementById('confirm-btn').disabled = false;
         } catch (err) {
           showToast(err.message, 'error');
         } finally {
           btn.disabled = false;
-          btn.textContent = 'Preview Distribution';
         }
       });
 
-      // Confirm button → open modal
-      document.getElementById('confirm-btn').addEventListener('click', () => {
-        if (!previewData || !previewData.investors?.length) return;
-
-        const month = document.getElementById('distMonth').value;
-        const year = document.getElementById('distYear').value;
-        const distDate = document.getElementById('distDate').value;
-        const formattedDistDate = distDate ? new Date(distDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Today';
-        const profitPerShare = document.getElementById('profitPerShare').value;
-        const projectSelect = document.getElementById('projectId');
-        const projectName = projectSelect.options[projectSelect.selectedIndex]?.textContent || 'Project';
-
-        document.getElementById('confirm-detail').innerHTML = `
-          <strong>Project:</strong> ${escapeHtml(projectName)}<br>
-          <strong>Start Date:</strong> <span style="color:var(--gold);font-weight:700;">${escapeHtml(formattedDistDate)}</span><br>
-          <strong>Period:</strong> ${MONTH_NAMES[Number(month)]} ${year}<br>
-          <strong>Profit Per Share:</strong> ${formatMoney(profitPerShare)}<br>
-          <strong>Total Investors:</strong> ${previewData.totalInvestors}<br>
-          <strong>Total Shares:</strong> ${Number(previewData.totalShares).toLocaleString()}<br>
-          <strong>Grand Total:</strong> <span style="color:#10B981;font-weight:800;">${formatMoney(previewData.grandTotal)}</span>
-        `;
-
-        document.getElementById('confirm-overlay').classList.add('open');
-      });
-
-      // Cancel modal
-      document.getElementById('confirm-cancel').addEventListener('click', () => {
-        document.getElementById('confirm-overlay').classList.remove('open');
-      });
-      document.getElementById('confirm-overlay').addEventListener('click', (e) => {
-        if (e.target === document.getElementById('confirm-overlay')) {
-          document.getElementById('confirm-overlay').classList.remove('open');
+      document.getElementById('schedules-table').addEventListener('click', async (e) => {
+        const processBtn = e.target.closest('.btn-process-schedule');
+        const toggleBtn = e.target.closest('.btn-toggle-schedule');
+        if (processBtn) {
+          try { await processDue(processBtn.getAttribute('data-id')); } catch (err) { showToast(err.message, 'error'); }
         }
-      });
-
-      // Execute distribution
-      document.getElementById('confirm-execute').addEventListener('click', async () => {
-        const btn = document.getElementById('confirm-execute');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="loading-spinner"></span> Processing…';
-
-        try {
-          const result = await apiFetch('/distributions/confirm', {
-            method: 'POST',
-            body: JSON.stringify({
-              projectId: document.getElementById('projectId').value,
-              profitPerShare: Number(document.getElementById('profitPerShare').value),
-              month: Number(document.getElementById('distMonth').value),
-              year: Number(document.getElementById('distYear').value),
-              distributionDate: document.getElementById('distDate').value
-            })
-          });
-
-          document.getElementById('confirm-overlay').classList.remove('open');
-          showToast(`✅ Profit distributed successfully! ${formatMoney(result.totalDistributed)} to ${result.totalInvestors} investors.`, 'success');
-
-          // Reset form
-          previewData = null;
-          document.getElementById('preview-section').classList.remove('visible');
-          document.getElementById('confirm-btn').disabled = true;
-          document.getElementById('profitPerShare').value = '';
-
-          // Refresh audit log to show the new entry
-          await loadAuditLog();
-        } catch (err) {
-          showToast(err.message, 'error');
-        } finally {
-          btn.disabled = false;
-          btn.innerHTML = 'Confirm &amp; Distribute';
+        if (toggleBtn) {
+          const id = toggleBtn.getAttribute('data-id');
+          const current = toggleBtn.getAttribute('data-status');
+          const next = current === 'active' ? 'paused' : 'active';
+          try {
+            await apiFetch(`/distributions/schedules/${id}/status`, {
+              method: 'PUT',
+              body: JSON.stringify({ status: next })
+            });
+            showToast(`Schedule ${next === 'active' ? 'resumed' : 'paused'}`, 'success');
+            await loadSchedules();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
         }
       });
     });

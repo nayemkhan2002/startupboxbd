@@ -96,6 +96,9 @@ const withdrawalSchema = new mongoose.Schema({
   paymentInfo: { type: Object, default: {} },
   status: { type: String, default: 'pending', index: true },
   adminNote: String,
+  referenceNo: String,
+  screenshotUrl: String,
+  completedAt: String,
   createdAt: String,
   updatedAt: String
 }, opts);
@@ -105,6 +108,7 @@ const payoutSchema = new mongoose.Schema({
   investorId: { type: String, index: true },
   investmentId: { type: String, index: true },
   projectId: { type: String, index: true },
+  withdrawalId: { type: String, index: true },
   amount: { type: Number, default: 0 },
   monthYear: String,
   paymentMethod: { type: String, default: 'Bank Transfer' },
@@ -125,6 +129,11 @@ const profitImageSchema = new mongoose.Schema({
 const profitDistributionSchema = new mongoose.Schema({
   _id: idField,
   projectId: { type: String, required: true, index: true },
+  scheduleId: { type: String, index: true },
+  cycleNumber: { type: Number },
+  cycleType: { type: String },
+  periodStart: String,
+  periodEnd: String,
   profitPerShare: { type: Number, required: true },
   month: { type: Number, required: true },
   year: { type: Number, required: true },
@@ -137,8 +146,27 @@ const profitDistributionSchema = new mongoose.Schema({
   createdAt: String
 }, opts);
 
-// Duplicate protection: only one distribution per project per month per year
-profitDistributionSchema.index({ projectId: 1, month: 1, year: 1 }, { unique: true });
+profitDistributionSchema.index(
+  { projectId: 1, month: 1, year: 1 },
+  { unique: true, partialFilterExpression: { scheduleId: { $exists: false } } }
+);
+profitDistributionSchema.index(
+  { scheduleId: 1, cycleNumber: 1 },
+  { unique: true, partialFilterExpression: { scheduleId: { $exists: true } } }
+);
+
+const profitScheduleSchema = new mongoose.Schema({
+  _id: idField,
+  projectId: { type: String, required: true, index: true },
+  cycleType: { type: String, default: 'weekly' },
+  profitPerShare: { type: Number, required: true },
+  startDate: { type: String, required: true },
+  status: { type: String, default: 'active', index: true },
+  cyclesProcessed: { type: Number, default: 0 },
+  createdBy: { type: String, index: true },
+  createdAt: String,
+  updatedAt: String
+}, opts);
 
 const investorProfitLedgerSchema = new mongoose.Schema({
   _id: idField,
@@ -183,6 +211,7 @@ module.exports = {
   Payout: mongoose.model('Payout', payoutSchema),
   ProfitImage: mongoose.model('ProfitImage', profitImageSchema),
   ProfitDistribution: mongoose.model('ProfitDistribution', profitDistributionSchema),
+  ProfitSchedule: mongoose.model('ProfitSchedule', profitScheduleSchema),
   InvestorProfitLedger: mongoose.model('InvestorProfitLedger', investorProfitLedgerSchema),
   AuditLog: mongoose.model('AuditLog', auditLogSchema),
   Wallet: mongoose.model('Wallet', walletSchema)

@@ -42,8 +42,8 @@
         <div class="flex gap-2" style="align-items:center;">
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
-            <h1>Profit Payouts</h1>
-            <p class="welcome">Monthly profit disbursements & bank transfer receipts</p>
+            <h1>Transfer Receipts</h1>
+            <p class="welcome">Bank/bKash transfer proof when your withdrawal is completed</p>
           </div>
         </div>
         <div class="topbar-actions">
@@ -55,19 +55,19 @@
         <div class="kpi-grid">
           <div class="kpi-card">
             <div class="kpi-icon">৳</div>
-            <div class="kpi-label">Total Profit Received</div>
+            <div class="kpi-label">Total Transferred</div>
             <div class="kpi-value success" id="kpi-total-profit">—</div>
-            <div class="kpi-hint">Directly credited to profile</div>
+            <div class="kpi-hint">Cash sent to your bank/bKash</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-icon">📜</div>
-            <div class="kpi-label">Total Disbursements</div>
+            <div class="kpi-label">Total Receipts</div>
             <div class="kpi-value" id="kpi-payout-count">—</div>
-            <div class="kpi-hint">Recorded bank transfers</div>
+            <div class="kpi-hint">Completed withdrawal transfers</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-icon">📅</div>
-            <div class="kpi-label">Latest Payout Date</div>
+            <div class="kpi-label">Latest Transfer</div>
             <div class="kpi-value" id="kpi-latest-date" style="font-size:1.1rem;padding-top:4px;">—</div>
             <div class="kpi-hint">Most recent profit transfer</div>
           </div>
@@ -75,7 +75,7 @@
 
         <div class="panel mt-3">
           <div class="panel-header flex-between" style="flex-wrap:wrap;gap:10px;">
-            <h2>Profit Disbursement Statements</h2>
+            <h2>Withdrawal Transfer Statements</h2>
             <span class="text-muted" id="payout-count-label">—</span>
           </div>
           <div class="table-wrap">
@@ -83,8 +83,7 @@
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Month / Period</th>
-                  <th>Project</th>
+                  <th>Type</th>
                   <th>Amount</th>
                   <th>Method</th>
                   <th>Reference / Note</th>
@@ -92,7 +91,7 @@
                 </tr>
               </thead>
               <tbody id="payouts-table">
-                <tr><td colspan="7"><div class="skeleton skeleton-line"></div></td></tr>
+                <tr><td colspan="6"><div class="skeleton skeleton-line"></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -127,11 +126,10 @@
       const title = document.getElementById('receipt-modal-title');
       const details = document.getElementById('receipt-details');
 
-      title.textContent = `Bank Transfer Receipt — ${payout.monthYear || 'Profit Payout'}`;
+      title.textContent = `Transfer Receipt — ${payout.monthYear || 'Withdrawal'}`;
       img.src = payout.screenshotUrl;
       details.innerHTML = `
-        <strong>${escapeHtml(payout.project?.title || 'Project')}</strong> | 
-        Amount: <strong>${formatMoney(payout.amount)}</strong> | 
+        Amount: <strong>${formatMoney(payout.amount)}</strong> |
         Method: <strong>${escapeHtml(payout.paymentMethod)}</strong>
         ${payout.referenceNo ? `<br>Ref: <code>${escapeHtml(payout.referenceNo)}</code>` : ''}`;
       modal.style.display = 'block';
@@ -164,11 +162,11 @@
         if (!allPayouts.length) {
           tbody.innerHTML = `
             <tr>
-              <td colspan="7">
+              <td colspan="6">
                 <div class="empty-state surface-card" style="padding:32px;">
                   <div class="empty-icon">💰</div>
-                  <h3>No profit disbursements yet</h3>
-                  <p>When admin transfers monthly profit, statements and bank receipts will appear here.</p>
+                  <h3>No transfer receipts yet</h3>
+                  <p>When your withdrawal is completed, transfer proof will appear here.</p>
                 </div>
               </td>
             </tr>`;
@@ -178,12 +176,11 @@
         tbody.innerHTML = allPayouts.map((p) => `
           <tr>
             <td data-label="Date"><strong>${formatDate(p.payoutDate)}</strong></td>
-            <td data-label="Month / Period">
+            <td data-label="Type">
               <span class="badge" style="background:var(--bg-subtle,#edf2f7);color:var(--navy);font-weight:600;">
-                ${escapeHtml(p.monthYear || 'Monthly')}
+                ${escapeHtml(p.withdrawalId ? 'Withdrawal' : (p.monthYear || 'Transfer'))}
               </span>
             </td>
-            <td data-label="Project"><strong>${escapeHtml(p.project?.title || '—')}</strong></td>
             <td data-label="Amount" class="text-success"><strong>${formatMoney(p.amount)}</strong></td>
             <td data-label="Method">${escapeHtml(p.paymentMethod || 'Bank Transfer')}</td>
             <td data-label="Reference / Note">
@@ -211,7 +208,7 @@
         showToast(err.message, 'error');
         const tbody = document.getElementById('payouts-table');
         if (tbody) {
-          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state surface-card" style="padding:32px;"><h3>Failed to load</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state surface-card" style="padding:32px;"><h3>Failed to load</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
         }
       }
     });

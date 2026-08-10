@@ -27,6 +27,135 @@
       line-height: 1.6;
     }
     .info-banner strong { color: var(--navy); }
+    .search-panel { margin-bottom: 20px; }
+    .search-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .search-row .form-group { flex: 1; min-width: 220px; margin-bottom: 0; }
+    .search-results {
+      margin-top: 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #fff;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+    }
+    .search-results.open { display: block; }
+    .search-result-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+    }
+    .search-result-item:hover,
+    .search-result-item.active { background: rgba(212, 160, 23, 0.08); }
+    .search-result-item:last-child { border-bottom: none; }
+    .earnings-panel { display: none; margin-bottom: 24px; }
+    .earnings-panel.open { display: block; }
+    .earnings-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    .earnings-kpis {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .earnings-kpi {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      min-width: 140px;
+    }
+    .earnings-kpi .lbl { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 4px; }
+    .earnings-kpi .val { font-size: 1.1rem; font-weight: 700; color: var(--navy); }
+    .earnings-kpi .val.green { color: #059669; }
+    .earnings-kpi .val.orange { color: #d97706; }
+    .freq-tabs {
+      display: inline-flex;
+      gap: 6px;
+      background: var(--bg-subtle);
+      padding: 4px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+    .freq-tabs button {
+      border: none;
+      background: transparent;
+      padding: 8px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+    .freq-tabs button.active {
+      background: #fff;
+      color: var(--navy);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .cycle-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .cycle-badge.unpaid { background: rgba(217,119,6,0.12); color: #b45309; }
+    .cycle-badge.paid { background: rgba(5,150,105,0.12); color: #047857; }
+    .pay-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(10,15,44,.55);
+      z-index: 2000;
+      backdrop-filter: blur(4px);
+      padding: 24px;
+      overflow-y: auto;
+    }
+    .pay-overlay.open { display: flex; align-items: center; justify-content: center; }
+    .pay-box {
+      background: #fff;
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+    }
+    .pay-detail {
+      background: var(--bg-subtle);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      font-size: 0.88rem;
+      line-height: 1.7;
+    }
+    .image-preview-box {
+      min-height: 90px;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: var(--bg-subtle);
+    }
+    .image-preview-box img { max-height: 90px; border-radius: 6px; }
+    .section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 24px 0 12px;
+    }
   </style>
 </head>
 <body>
@@ -71,19 +200,85 @@
         <div class="flex gap-2" style="align-items:flex-start;">
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
-            <h2>Transfer Receipts</h2>
-            <p>Proof of bank/bKash transfers created when withdrawals are completed.</p>
+            <h2>Profit Payouts</h2>
+            <p>Search an investor, review weekly/monthly earnings, then record bank or bKash transfers.</p>
           </div>
         </div>
         <a href="/admin/withdrawals.html" class="btn btn-outline btn-sm">Manage Withdrawals</a>
       </div>
 
       <div class="info-banner">
-        <strong>How it works:</strong> Profit is credited automatically via <a href="/admin/assign-profit.html">Assign Profit</a> schedules.
-        When investors request a withdrawal, complete it on the <a href="/admin/withdrawals.html">Withdrawals</a> page with transfer proof.
-        Receipts appear here automatically — no manual profit entry needed.
+        <strong>Manual payout workflow:</strong> Search investor by email or name → see profit earned per project
+        (e.g. <strong>4 × ৳367 = ৳1,468</strong>) → send payment via bank/bKash → record transfer proof here.
+        Withdrawal receipts from investor requests also appear in the history below.
       </div>
 
+      <div class="panel search-panel">
+        <h3 style="margin-bottom:14px;color:var(--navy);">Find Investor</h3>
+        <div class="search-row">
+          <div class="form-group">
+            <label>Email or Name</label>
+            <input type="text" id="investor-search" class="form-control" placeholder="e.g. investor@email.com or John" autocomplete="off">
+          </div>
+          <button type="button" class="btn" id="search-btn">Search</button>
+        </div>
+        <div class="search-results" id="search-results"></div>
+      </div>
+
+      <div class="panel earnings-panel" id="earnings-panel">
+        <div class="earnings-header">
+          <div>
+            <h3 style="margin-bottom:4px;color:var(--navy);" id="selected-investor-name">—</h3>
+            <p class="text-muted" style="font-size:0.88rem;margin:0;" id="selected-investor-meta">—</p>
+          </div>
+          <div class="freq-tabs" id="freq-tabs">
+            <button type="button" data-frequency="all" class="active">All</button>
+            <button type="button" data-frequency="weekly">Weekly</button>
+            <button type="button" data-frequency="monthly">Monthly</button>
+          </div>
+        </div>
+
+        <div class="earnings-kpis">
+          <div class="earnings-kpi">
+            <div class="lbl">Total Earned</div>
+            <div class="val green" id="kpi-accrued">—</div>
+          </div>
+          <div class="earnings-kpi">
+            <div class="lbl">Already Paid</div>
+            <div class="val" id="kpi-paid">—</div>
+          </div>
+          <div class="earnings-kpi">
+            <div class="lbl">Unpaid (Owed)</div>
+            <div class="val orange" id="kpi-unpaid">—</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin:16px 0 8px;">
+          <button type="button" class="btn btn-sm" id="pay-all-btn" style="display:none;">Pay Total Unpaid</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Shares</th>
+                <th>Schedule</th>
+                <th>Period / Cycle</th>
+                <th>Calculation</th>
+                <th>Earned</th>
+                <th>Unpaid</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="earnings-table">
+              <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section-title">Payment History</div>
       <div class="panel">
         <div class="table-wrap">
           <table class="data-table">
@@ -107,15 +302,74 @@
     </main>
   </div>
 
+  <div class="pay-overlay" id="pay-overlay">
+    <div class="pay-box">
+      <h3 style="margin-bottom:12px;color:var(--navy);">Record Manual Payout</h3>
+      <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">
+        Enter proof after you send the transfer via bank or bKash.
+      </p>
+      <div class="pay-detail" id="pay-detail"></div>
+      <div id="pay-error" class="error-msg" style="display:none;"></div>
+      <form id="pay-form">
+        <input type="hidden" id="pay-investor-id">
+        <input type="hidden" id="pay-project-id">
+        <input type="hidden" id="pay-period-label">
+        <input type="hidden" id="pay-cycle-number">
+        <div class="form-group">
+          <label>Amount (৳)</label>
+          <input type="number" id="pay-amount" class="form-control" min="1" step="1" required>
+        </div>
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select id="pay-method" class="form-control">
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="bKash">bKash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reference / TxID</label>
+          <input type="text" id="pay-reference" class="form-control" placeholder="e.g. TRX98273619283">
+        </div>
+        <div class="form-group">
+          <label>Transfer Screenshot (Proof)</label>
+          <input type="file" id="pay-screenshot" class="form-control" accept="image/*,.pdf">
+          <div class="image-preview-box mt-1" id="pay-preview-box">
+            <span class="text-muted" id="pay-preview-placeholder">No receipt uploaded</span>
+            <img id="pay-preview-img" style="display:none;" alt="Preview">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Note (optional)</label>
+          <textarea id="pay-note" class="form-control" rows="2" placeholder="e.g. Weekly profit Aug 3–9"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+          <button type="button" class="btn btn-outline" id="pay-cancel">Cancel</button>
+          <button type="submit" class="btn" id="pay-submit">Save Payout</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/investor.js"></script>
   <script>
+    let selectedInvestor = null;
+    let currentFrequency = 'all';
+    let earningsPreview = null;
+    let searchTimer = null;
+
+    const payoutTypeLabel = (p) => {
+      if (p.withdrawalId) return 'Withdrawal';
+      if (p.payoutType === 'manual_profit') return 'Manual Profit';
+      return p.monthYear || 'Transfer';
+    };
+
     const loadTable = async () => {
       const tbody = document.getElementById('payouts-table');
       try {
         const allPayouts = await apiFetch('/payouts');
         if (!allPayouts.length) {
-          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No transfer receipts yet</h3><p>Complete a withdrawal request with payment proof to create a receipt.</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><h3>No payment records yet</h3><p>Record a manual profit payout above or complete a withdrawal with proof.</p></div></td></tr>`;
           return;
         }
         tbody.innerHTML = allPayouts.map((p) => `
@@ -123,7 +377,7 @@
             <td>${formatDate(p.payoutDate)}</td>
             <td><strong>${escapeHtml(p.investor?.name || '—')}</strong><br><small class="text-muted">${escapeHtml(p.investor?.email || '')}</small></td>
             <td class="text-success"><strong>${formatMoney(p.amount)}</strong></td>
-            <td><span class="badge">${escapeHtml(p.withdrawalId ? 'Withdrawal' : (p.monthYear || 'Transfer'))}</span></td>
+            <td><span class="badge">${escapeHtml(payoutTypeLabel(p))}</span>${p.project?.title ? `<br><small class="text-muted">${escapeHtml(p.project.title)}</small>` : ''}</td>
             <td>${escapeHtml(p.paymentMethod || 'Bank')}<br><small class="text-muted">${escapeHtml(p.referenceNo || '')}</small></td>
             <td>
               ${p.screenshotUrl
@@ -140,6 +394,179 @@
       }
     };
 
+    const renderSearchResults = (results) => {
+      const box = document.getElementById('search-results');
+      if (!results.length) {
+        box.innerHTML = `<div class="search-result-item text-muted">No investors found</div>`;
+        box.classList.add('open');
+        return;
+      }
+      box.innerHTML = results.map((inv) => `
+        <div class="search-result-item"
+          data-id="${escapeHtml(inv._id)}"
+          data-name="${escapeHtml(inv.name || '')}"
+          data-email="${escapeHtml(inv.email || '')}"
+          data-phone="${escapeHtml(inv.phone || '')}">
+          <strong>${escapeHtml(inv.name || 'Investor')}</strong><br>
+          <small class="text-muted">${escapeHtml(inv.email || '')}${inv.phone ? ` · ${escapeHtml(inv.phone)}` : ''}</small>
+        </div>`).join('');
+      box.classList.add('open');
+    };
+
+    const searchInvestors = async (query) => {
+      const q = query.trim();
+      if (q.length < 2) {
+        document.getElementById('search-results').classList.remove('open');
+        return;
+      }
+      try {
+        const results = await apiFetch(`/payouts/investor-search?q=${encodeURIComponent(q)}`);
+        renderSearchResults(results);
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    };
+
+    const renderEarnings = () => {
+      const panel = document.getElementById('earnings-panel');
+      const tbody = document.getElementById('earnings-table');
+      if (!earningsPreview) {
+        panel.classList.remove('open');
+        return;
+      }
+
+      panel.classList.add('open');
+      const inv = earningsPreview.investor;
+      document.getElementById('selected-investor-name').textContent = inv.name || 'Investor';
+      document.getElementById('selected-investor-meta').textContent = `${inv.email || ''}${inv.phone ? ` · ${inv.phone}` : ''}`;
+
+      document.getElementById('kpi-accrued').textContent = formatMoney(earningsPreview.totalAccrued);
+      document.getElementById('kpi-paid').textContent = formatMoney(earningsPreview.totalPaid);
+      document.getElementById('kpi-unpaid').textContent = formatMoney(earningsPreview.totalUnpaid);
+
+      const payAllBtn = document.getElementById('pay-all-btn');
+      payAllBtn.style.display = earningsPreview.totalUnpaid > 0 ? 'inline-flex' : 'none';
+
+      const projects = earningsPreview.projects || [];
+      if (!projects.length) {
+        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No scheduled profit</h3><p>This investor has no active weekly/monthly profit schedules for the selected filter.</p></div></td></tr>`;
+        return;
+      }
+
+      const rows = [];
+      projects.forEach((p) => {
+        const unpaidCycles = (p.cycles || []).filter((c) => c.status === 'unpaid');
+        if (!unpaidCycles.length && (p.unpaidAccrued || 0) <= 0) {
+          rows.push(`
+            <tr>
+              <td><strong>${escapeHtml(p.projectTitle)}</strong></td>
+              <td>${Number(p.shares).toLocaleString()}</td>
+              <td>${escapeHtml(p.profitSchedule || '—')}</td>
+              <td>${escapeHtml(p.currentCyclePeriod || '—')}</td>
+              <td><small class="text-muted">${escapeHtml(p.earnedFormula || '—')}</small></td>
+              <td class="text-success">${formatMoney(p.earnedSoFar)}</td>
+              <td>—</td>
+              <td><span class="cycle-badge paid">Paid</span></td>
+            </tr>`);
+          return;
+        }
+
+        unpaidCycles.forEach((cycle, idx) => {
+          rows.push(`
+            <tr>
+              <td>${idx === 0 ? `<strong>${escapeHtml(p.projectTitle)}</strong>` : ''}</td>
+              <td>${idx === 0 ? Number(p.shares).toLocaleString() : ''}</td>
+              <td>${idx === 0 ? escapeHtml(p.profitSchedule || '—') : ''}</td>
+              <td>
+                <strong>Cycle ${cycle.cycleNumber}</strong><br>
+                <small class="text-muted">${escapeHtml(cycle.periodLabel)}</small>
+              </td>
+              <td><small>${escapeHtml(cycle.formula)}</small></td>
+              <td class="text-success">${formatMoney(cycle.amount)}</td>
+              <td class="text-warning"><strong>${formatMoney(cycle.amount)}</strong></td>
+              <td>
+                <button type="button" class="btn btn-sm pay-cycle-btn"
+                  data-project-id="${escapeHtml(p.projectId)}"
+                  data-amount="${cycle.amount}"
+                  data-period="${escapeHtml(cycle.periodLabel)}"
+                  data-cycle="${cycle.cycleNumber}"
+                  data-project-title="${escapeHtml(p.projectTitle)}">Pay</button>
+              </td>
+            </tr>`);
+        });
+
+        if (!unpaidCycles.length && (p.unpaidAccrued || 0) > 0) {
+          rows.push(`
+            <tr>
+              <td><strong>${escapeHtml(p.projectTitle)}</strong></td>
+              <td>${Number(p.shares).toLocaleString()}</td>
+              <td>${escapeHtml(p.profitSchedule || '—')}</td>
+              <td>—</td>
+              <td><small>${escapeHtml(p.earnedFormula || '—')}</small></td>
+              <td class="text-success">${formatMoney(p.earnedSoFar)}</td>
+              <td class="text-warning"><strong>${formatMoney(p.unpaidAccrued)}</strong></td>
+              <td>
+                <button type="button" class="btn btn-sm pay-project-btn"
+                  data-project-id="${escapeHtml(p.projectId)}"
+                  data-amount="${p.unpaidAccrued}"
+                  data-project-title="${escapeHtml(p.projectTitle)}">Pay</button>
+              </td>
+            </tr>`);
+        }
+      });
+
+      tbody.innerHTML = rows.join('');
+    };
+
+    const loadEarnings = async () => {
+      if (!selectedInvestor) return;
+      try {
+        earningsPreview = await apiFetch(
+          `/payouts/earnings-preview?investorId=${encodeURIComponent(selectedInvestor._id)}&frequency=${encodeURIComponent(currentFrequency)}`
+        );
+        renderEarnings();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    };
+
+    const selectInvestor = async (investor) => {
+      selectedInvestor = investor;
+      document.getElementById('investor-search').value = investor.email || investor.name || '';
+      document.getElementById('search-results').classList.remove('open');
+      await loadEarnings();
+    };
+
+    const openPayModal = ({ projectId = '', amount = 0, periodLabel = '', cycleNumber = '', projectTitle = '' }) => {
+      if (!selectedInvestor) return;
+      document.getElementById('pay-investor-id').value = selectedInvestor._id;
+      document.getElementById('pay-project-id').value = projectId;
+      document.getElementById('pay-period-label').value = periodLabel;
+      document.getElementById('pay-cycle-number').value = cycleNumber;
+      document.getElementById('pay-amount').value = Math.round(Number(amount) || 0);
+      document.getElementById('pay-method').value = 'Bank Transfer';
+      document.getElementById('pay-reference').value = '';
+      document.getElementById('pay-note').value = periodLabel ? `Profit for ${periodLabel}` : '';
+      document.getElementById('pay-screenshot').value = '';
+      document.getElementById('pay-preview-img').style.display = 'none';
+      document.getElementById('pay-preview-placeholder').style.display = 'block';
+      document.getElementById('pay-error').style.display = 'none';
+
+      const detail = document.getElementById('pay-detail');
+      detail.innerHTML = `
+        <strong>${escapeHtml(selectedInvestor.name || 'Investor')}</strong><br>
+        ${escapeHtml(selectedInvestor.email || '')}<br>
+        ${projectTitle ? `Project: <strong>${escapeHtml(projectTitle)}</strong><br>` : ''}
+        ${periodLabel ? `Period: <strong>${escapeHtml(periodLabel)}</strong><br>` : ''}
+        Amount: <strong>${formatMoney(amount)}</strong>`;
+
+      document.getElementById('pay-overlay').classList.add('open');
+    };
+
+    const closePayModal = () => {
+      document.getElementById('pay-overlay').classList.remove('open');
+    };
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('admin');
       if (!user) return;
@@ -152,15 +579,146 @@
 
       await loadTable();
 
+      document.getElementById('investor-search').addEventListener('input', (e) => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => searchInvestors(e.target.value), 300);
+      });
+
+      document.getElementById('search-btn').addEventListener('click', () => {
+        searchInvestors(document.getElementById('investor-search').value);
+      });
+
+      document.getElementById('search-results').addEventListener('click', (e) => {
+        const item = e.target.closest('.search-result-item');
+        if (!item || !item.dataset.id) return;
+        selectInvestor({
+          _id: item.dataset.id,
+          name: item.dataset.name,
+          email: item.dataset.email,
+          phone: item.dataset.phone
+        });
+      });
+
+      document.getElementById('freq-tabs').addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-frequency]');
+        if (!btn) return;
+        document.querySelectorAll('#freq-tabs button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFrequency = btn.dataset.frequency;
+        await loadEarnings();
+      });
+
+      document.getElementById('pay-all-btn').addEventListener('click', () => {
+        if (!earningsPreview) return;
+        openPayModal({
+          amount: earningsPreview.totalUnpaid,
+          periodLabel: 'All unpaid profit'
+        });
+      });
+
+      document.getElementById('earnings-table').addEventListener('click', (e) => {
+        const cycleBtn = e.target.closest('.pay-cycle-btn');
+        if (cycleBtn) {
+          openPayModal({
+            projectId: cycleBtn.dataset.projectId,
+            amount: cycleBtn.dataset.amount,
+            periodLabel: cycleBtn.dataset.period,
+            cycleNumber: cycleBtn.dataset.cycle,
+            projectTitle: cycleBtn.dataset.projectTitle
+          });
+          return;
+        }
+        const projectBtn = e.target.closest('.pay-project-btn');
+        if (projectBtn) {
+          openPayModal({
+            projectId: projectBtn.dataset.projectId,
+            amount: projectBtn.dataset.amount,
+            projectTitle: projectBtn.dataset.projectTitle
+          });
+        }
+      });
+
+      document.getElementById('pay-cancel').addEventListener('click', closePayModal);
+      document.getElementById('pay-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'pay-overlay') closePayModal();
+      });
+
+      document.getElementById('pay-screenshot').addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        const img = document.getElementById('pay-preview-img');
+        const placeholder = document.getElementById('pay-preview-placeholder');
+        if (!file || !file.type.startsWith('image/')) {
+          img.style.display = 'none';
+          placeholder.style.display = 'block';
+          placeholder.textContent = file ? 'PDF selected' : 'No receipt uploaded';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          img.src = reader.result;
+          img.style.display = 'block';
+          placeholder.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      });
+
+      document.getElementById('pay-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('pay-error');
+        const submitBtn = document.getElementById('pay-submit');
+        errEl.style.display = 'none';
+        submitBtn.disabled = true;
+
+        try {
+          let screenshotUrl = '';
+          const file = document.getElementById('pay-screenshot').files?.[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append('screenshot', file);
+            const uploadRes = await apiFetch('/payouts/upload', { method: 'POST', body: formData });
+            screenshotUrl = uploadRes.screenshotUrl;
+          }
+
+          const referenceNo = document.getElementById('pay-reference').value.trim();
+          if (!referenceNo && !screenshotUrl) {
+            throw new Error('Provide a reference number or transfer screenshot');
+          }
+
+          await apiFetch('/payouts/manual', {
+            method: 'POST',
+            body: JSON.stringify({
+              investorId: document.getElementById('pay-investor-id').value,
+              projectId: document.getElementById('pay-project-id').value || undefined,
+              amount: Number(document.getElementById('pay-amount').value),
+              paymentMethod: document.getElementById('pay-method').value,
+              referenceNo,
+              screenshotUrl,
+              notes: document.getElementById('pay-note').value.trim(),
+              periodLabel: document.getElementById('pay-period-label').value,
+              cycleNumber: document.getElementById('pay-cycle-number').value || undefined
+            })
+          });
+
+          showToast('Payout recorded successfully', 'success');
+          closePayModal();
+          await Promise.all([loadEarnings(), loadTable()]);
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.style.display = 'block';
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
       document.getElementById('payouts-table').addEventListener('click', async (e) => {
         const deleteBtn = e.target.closest('.delete-btn');
         if (!deleteBtn) return;
-        const ok = await confirmDialog('Delete this receipt record? The withdrawal will remain completed.', { title: 'Delete Receipt?', danger: true, confirmText: 'Delete' });
+        const ok = await confirmDialog('Delete this payout record?', { title: 'Delete Record?', danger: true, confirmText: 'Delete' });
         if (!ok) return;
         try {
           await apiFetch(`/payouts/${deleteBtn.dataset.id}`, { method: 'DELETE' });
-          showToast('Receipt deleted', 'success');
-          loadTable();
+          showToast('Record deleted', 'success');
+          await Promise.all([loadTable(), selectedInvestor ? loadEarnings() : Promise.resolve()]);
         } catch (err) {
           showToast(err.message, 'error');
         }

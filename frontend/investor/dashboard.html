@@ -52,7 +52,7 @@
             <div class="kpi-icon">↑</div>
             <div class="kpi-label">Total Return Earned</div>
             <div class="kpi-value success" id="kpi-earned">—</div>
-            <div class="kpi-hint">Credited returns</div>
+            <div class="kpi-hint" id="kpi-earned-hint">Completed cycles (admin pays manually)</div>
           </div>
           <div class="kpi-card">
             <div class="kpi-icon">⇄</div>
@@ -215,6 +215,13 @@
           document.getElementById('kpi-active').textContent = stats.activeInvestments;
           const totalEarned = Number(stats.totalReturnEarned) || 0;
           document.getElementById('kpi-earned').textContent = formatMoney(totalEarned);
+          const formulas = projectBreakdown
+            .filter(p => p.earnedFormula && p.earnedSoFar > 0)
+            .map(p => `${p.projectTitle}: ${p.earnedFormula}`);
+          const earnedHint = document.getElementById('kpi-earned-hint');
+          if (formulas.length) {
+            earnedHint.textContent = formulas.join(' · ');
+          }
           document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
         }
 
@@ -239,7 +246,10 @@
               <tr>
                 <td data-label="Project"><strong>${escapeHtml(p.projectTitle)}</strong></td>
                 <td data-label="Your Shares">${Number(p.shares).toLocaleString()}</td>
-                <td data-label="Earned So Far" class="text-success"><strong>${formatMoney(p.earnedSoFar)}</strong></td>
+                <td data-label="Earned So Far" class="text-success">
+                  <strong>${formatMoney(p.earnedSoFar)}</strong>
+                  ${p.earnedFormula ? `<br><small class="text-muted">${escapeHtml(p.earnedFormula)}</small>` : ''}
+                </td>
                 <td data-label="Profit Schedule">${scheduleCell}</td>
                 <td data-label="Current Cycle">${cycleCell}</td>
                 <td data-label="Next Payout">${nextCell}</td>

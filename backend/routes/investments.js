@@ -3,6 +3,7 @@ const router = express.Router();
 const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
+const { buildProjectBreakdown } = require('../services/profitCalculationService');
 
 // Investor: my investments
 router.get('/my', protect, async (req, res) => {
@@ -34,7 +35,13 @@ router.get('/stats', protect, async (req, res) => {
       return res.status(400).json({ message: 'investorId query parameter is required for admin' });
     }
     const stats = await DB.investments.getPortfolioStats(investorId);
-    res.json(stats);
+    const projectBreakdown = await buildProjectBreakdown(investorId);
+    const accruedTotal = projectBreakdown.reduce((s, p) => s + (p.earnedSoFar || 0), 0);
+    res.json({
+      ...stats,
+      totalReturnEarned: Math.max(Number(stats.totalReturnEarned) || 0, accruedTotal),
+      projectBreakdown
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

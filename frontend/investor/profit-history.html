@@ -213,7 +213,7 @@
               <div class="pb-stats">
                 <div class="pb-stat-item"><div class="lbl">Shares</div><div class="val">${Number(p.shares || p.totalShares).toLocaleString()}</div></div>
                 <div class="pb-stat-item"><div class="lbl">Cycles</div><div class="val">${p.completedCycles ?? p.distributions ?? 0}</div></div>
-                <div class="pb-stat-item"><div class="lbl">Earned</div><div class="val green">${formatMoney(p.earnedSoFar ?? p.totalProfit ?? 0)}</div></div>
+                <div class="pb-stat-item"><div class="lbl">Earned</div><div class="val green">${formatMoney(p.earnedSoFar ?? p.totalProfit ?? 0)}</div>${p.earnedFormula ? `<small class="text-muted" style="display:block;font-size:0.7rem;margin-top:4px;">${escapeHtml(p.earnedFormula)}</small>` : ''}</div>
               </div>
             </div>`).join('');
         }

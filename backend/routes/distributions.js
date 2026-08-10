@@ -183,7 +183,7 @@ router.get('/detail/:id/ledger', protect, adminOnly, async (req, res) => {
   }
 });
 
-// Investor: unified dashboard bundle (processes due cycles once)
+// Investor: unified dashboard bundle (display accrued profit; no auto-credit on load)
 router.get('/my/dashboard', protect, async (req, res) => {
   try {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
@@ -192,7 +192,7 @@ router.get('/my/dashboard', protect, async (req, res) => {
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
-    const bundle = await getInvestorDashboardBundle(investorId, { adminId: 'system' });
+    const bundle = await getInvestorDashboardBundle(investorId, { processCycles: false });
     res.json(bundle);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -205,7 +205,6 @@ router.get('/my', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCyclesOnce({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
@@ -222,7 +221,6 @@ router.get('/my/summary', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCyclesOnce({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;

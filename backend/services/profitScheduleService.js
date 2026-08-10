@@ -78,6 +78,21 @@ const getDueCycleNumbers = (schedule, asOf = new Date()) => {
   return due;
 };
 
+/** Calendar-completed cycles (period ended) — used for display / manual payout workflow. */
+const getCompletedCycleCount = (schedule, asOf = new Date()) => {
+  if (!schedule || schedule.status !== 'active') return schedule?.cyclesProcessed || 0;
+  const todayStr = getTodayDateStr(asOf);
+  let count = 0;
+  let cycle = 1;
+  while (cycle <= 520) {
+    const { periodEnd } = getCyclePeriod(schedule, cycle);
+    if (!isCycleDue(periodEnd, todayStr)) break;
+    count = cycle;
+    cycle += 1;
+  }
+  return count;
+};
+
 const getNextDueDate = (schedule) => {
   const nextCycle = (schedule.cyclesProcessed || 0) + 1;
   return getCyclePeriod(schedule, nextCycle).periodEnd;
@@ -184,6 +199,7 @@ module.exports = {
   BD_TIMEZONE,
   getTodayDateStr,
   getDueCycleNumbers,
+  getCompletedCycleCount,
   getCyclePeriod,
   isCycleDue,
   getNextDueDate,

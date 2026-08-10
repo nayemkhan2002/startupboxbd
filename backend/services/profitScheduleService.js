@@ -1,6 +1,6 @@
 const DB = require('../db');
 
-const CYCLE_DAYS = { weekly: 7, monthly: 30 };
+const CYCLE_DAYS = { weekly: 7 };
 const BD_TIMEZONE = 'Asia/Dhaka';
 
 const parseDateOnly = (str) => {
@@ -15,6 +15,14 @@ const dateToIsoDate = (d) => {
   return `${y}-${m}-${day}`;
 };
 
+const addCalendarMonths = (date, months) => {
+  const d = new Date(date);
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() !== day) d.setDate(0);
+  return d;
+};
+
 /** Today as YYYY-MM-DD in Bangladesh (UTC+6) — matches how admins set schedule dates */
 const getTodayDateStr = (asOf = new Date()) =>
   new Intl.DateTimeFormat('en-CA', {
@@ -24,7 +32,35 @@ const getTodayDateStr = (asOf = new Date()) =>
     day: '2-digit'
   }).format(asOf);
 
-const getCycleDays = (cycleType) => CYCLE_DAYS[cycleType] || 7;
+const getCycleDays = (cycleType) => (cycleType === 'weekly' ? 7 : 0);
+
+/**
+ * Cycle periods (inclusive end dates):
+ * Weekly start Aug 3 → Cycle 1: Aug 3–9, Cycle 2: Aug 10–16
+ * Monthly → calendar-month periods from start date
+ * Profit credits after periodEnd (today > periodEnd).
+ */
+const getCyclePeriod = (schedule, cycleNumber) => {
+  const start = parseDateOnly(schedule.startDate);
+  const n = Math.max(1, Number(cycleNumber) || 1);
+
+  if (schedule.cycleType === 'monthly') {
+    const periodStart = addCalendarMonths(start, n - 1);
+    const nextMonthStart = addCalendarMonths(start, n);
+    const periodEnd = new Date(nextMonthStart);
+    periodEnd.setDate(periodEnd.getDate() - 1);
+    return { periodStart: dateToIsoDate(periodStart), periodEnd: dateToIsoDate(periodEnd) };
+  }
+
+  const periodStart = new Date(start);
+  periodStart.setDate(periodStart.getDate() + (n - 1) * 7);
+  const periodEnd = new Date(periodStart);
+  periodEnd.setDate(periodEnd.getDate() + 6);
+  return { periodStart: dateToIsoDate(periodStart), periodEnd: dateToIsoDate(periodEnd) };
+};
+
+/** Cycles whose inclusive end date has passed (profit is due). */
+const isCycleDue = (periodEnd, todayStr) => todayStr > periodEnd;
 
 const getDueCycleNumbers = (schedule, asOf = new Date()) => {
   if (schedule.status !== 'active') return [];
@@ -35,26 +71,21 @@ const getDueCycleNumbers = (schedule, asOf = new Date()) => {
 
   while (cycle <= alreadyDone + 52) {
     const { periodEnd } = getCyclePeriod(schedule, cycle);
-    if (todayStr < periodEnd) break;
+    if (!isCycleDue(periodEnd, todayStr)) break;
     due.push(cycle);
     cycle += 1;
   }
   return due;
 };
 
-const getCyclePeriod = (schedule, cycleNumber) => {
-  const start = parseDateOnly(schedule.startDate);
-  const cycleDays = getCycleDays(schedule.cycleType);
-  const periodStart = new Date(start);
-  periodStart.setDate(periodStart.getDate() + (cycleNumber - 1) * cycleDays);
-  const periodEnd = new Date(periodStart);
-  periodEnd.setDate(periodEnd.getDate() + cycleDays);
-  return { periodStart: dateToIsoDate(periodStart), periodEnd: dateToIsoDate(periodEnd) };
-};
-
 const getNextDueDate = (schedule) => {
   const nextCycle = (schedule.cyclesProcessed || 0) + 1;
   return getCyclePeriod(schedule, nextCycle).periodEnd;
+};
+
+const getNextPeriodStart = (schedule) => {
+  const nextCycle = (schedule.cyclesProcessed || 0) + 1;
+  return getCyclePeriod(schedule, nextCycle).periodStart;
 };
 
 const enrichSchedule = async (schedule) => {
@@ -64,7 +95,7 @@ const enrichSchedule = async (schedule) => {
   return {
     ...schedule,
     project: project ? { _id: project._id, title: project.title, category: project.category } : null,
-    cycleDays: getCycleDays(schedule.cycleType),
+    cycleDays: schedule.cycleType === 'weekly' ? 7 : null,
     dueCyclesCount: dueCycles.length,
     nextDueDate,
     nextCycleNumber: (schedule.cyclesProcessed || 0) + 1
@@ -105,12 +136,18 @@ const processDueCycles = async (options = {}) => {
           adminId,
           distributionDate: periodEnd
         });
-        await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
 
-        if (dist) {
+        // Advance the schedule only when the cycle was credited or intentionally skipped
+        // (no share-holders). A hard failure leaves cyclesProcessed unchanged so the
+        // cycle retries on the next page load instead of vanishing unpaid.
+        if (dist === null) {
+          await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
+          skipped.push({ scheduleId: fresh._id, cycleNumber, reason: 'No investors hold shares in this project' });
+        } else if (dist) {
+          await DB.profitSchedules.incrementCyclesProcessed(fresh._id);
           processed.push({ scheduleId: fresh._id, cycleNumber, distribution: dist });
         } else {
-          skipped.push({ scheduleId: fresh._id, cycleNumber, reason: 'No investors hold shares in this project' });
+          errors.push({ scheduleId: fresh._id, cycleNumber, message: 'Cycle could not be credited' });
         }
       }
     } catch (err) {
@@ -121,10 +158,21 @@ const processDueCycles = async (options = {}) => {
   return { processed, skipped, errors };
 };
 
+/** Single-flight: multiple API calls in one page load share one processDueCycles run. */
+let dueCyclesInFlight = null;
+const processDueCyclesOnce = async (options = {}) => {
+  if (!dueCyclesInFlight) {
+    dueCyclesInFlight = processDueCycles(options).finally(() => {
+      dueCyclesInFlight = null;
+    });
+  }
+  return dueCyclesInFlight;
+};
+
 /** Never lets scheduled-profit processing break a read request. */
 const processDueCyclesSafe = async (options = {}) => {
   try {
-    return await processDueCycles(options);
+    return await processDueCyclesOnce(options);
   } catch (err) {
     console.error('processDueCycles crashed:', err.message);
     return { processed: [], skipped: [], errors: [{ message: err.message }] };
@@ -137,8 +185,11 @@ module.exports = {
   getTodayDateStr,
   getDueCycleNumbers,
   getCyclePeriod,
+  isCycleDue,
   getNextDueDate,
+  getNextPeriodStart,
   enrichSchedule,
   processDueCycles,
+  processDueCyclesOnce,
   processDueCyclesSafe
 };

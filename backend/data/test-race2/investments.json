@@ -1,0 +1,61 @@
+[
+  {
+    "_id": "8l28k4wycmsmc1736",
+    "investorId": "vtmetzar3msmc1732",
+    "projectId": "5kkaqz8s1msmc1734",
+    "amount": 1000,
+    "sharesCount": 4,
+    "roi": 0,
+    "duration": 0,
+    "durationUnit": "months",
+    "durationLabel": "",
+    "startDate": null,
+    "maturityDate": null,
+    "expectedReturn": 0,
+    "returnEarned": 400,
+    "profitNotAssigned": false,
+    "status": "active",
+    "paymentHistory": [
+      {
+        "type": "investment",
+        "label": "Initial Investment Allocated",
+        "amount": 1000,
+        "date": "2026-08-09T21:46:22.626Z"
+      },
+      {
+        "type": "profit_distribution",
+        "label": "Weekly Profit — Cycle 1 (2026-08-03 → 2026-08-10)",
+        "amount": 400,
+        "date": "2026-08-10T00:00:00.000Z"
+      }
+    ],
+    "timeline": [
+      {
+        "key": "approved",
+        "label": "Investment Approved",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "started",
+        "label": "Business Started",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "profit",
+        "label": "Profit Generated",
+        "date": null,
+        "done": false
+      },
+      {
+        "key": "completed",
+        "label": "Completed",
+        "date": null,
+        "done": false
+      }
+    ],
+    "notes": "",
+    "createdAt": "2026-08-09T21:46:22.626Z"
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "_id": "c7mprwczimsn3coa0",
+    "name": "T",
+    "email": "s@x.com",
+    "password": "$2b$10$rvbBPG1khunWC53QrGB87OZJm13oMwigG06eh5W/S.f.PwevImw6q",
+    "role": "investor",
+    "phone": "",
+    "address": "",
+    "profileImage": "",
+    "bankInfo": {
+      "method": "bkash",
+      "bkashNumber": "",
+      "bkashAccountType": "Personal",
+      "bankName": "",
+      "accountName": "",
+      "accountNumber": "",
+      "branch": "",
+      "routingNumber": ""
+    },
+    "createdAt": "2026-08-10T10:31:07.752Z"
+  }
+]

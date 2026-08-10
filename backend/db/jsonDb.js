@@ -32,6 +32,24 @@ const writeCollection = (collection, data) => {
   fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
 };
 
+// Serialize confirmScheduledCycle per schedule+cycle so concurrent callers cannot
+// both pass the ledger check and double-credit investors.
+const cycleLocks = new Map();
+const withCycleLock = async (key, fn) => {
+  while (cycleLocks.get(key)) {
+    await cycleLocks.get(key);
+  }
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  cycleLocks.set(key, gate);
+  try {
+    return await fn();
+  } finally {
+    cycleLocks.delete(key);
+    release();
+  }
+};
+
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
 const stripPassword = (user) => {
@@ -97,7 +115,6 @@ const initDb = async () => {
     updated = true;
     console.log('Seeded Admin user (admin@startupboxbd.com / password123)');
   } else {
-    // Verify existing admin password is correct; reset if it doesn't match.
     const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
     const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
     if (!passwordOk) {
@@ -990,132 +1007,148 @@ const DB = {
         periodStart, periodEnd, month, year, adminId, distributionDate
       } = payload;
 
-      const distributions = readCollection('distributions');
-      const existing = distributions.find(d =>
-        d.scheduleId === scheduleId && d.cycleNumber === cycleNumber
-      );
-      if (existing) return existing;
+      return withCycleLock(`${scheduleId}:${cycleNumber}`, async () => {
+        const preview = await DB.distributions.preview(projectId, profitPerShare);
+        if (!preview.investors.length) return null;
 
-      const preview = await DB.distributions.preview(projectId, profitPerShare);
-      // A project with no share-holding investors is a valid no-op: the cycle is
-      // still consumed so the schedule keeps advancing instead of retrying forever.
-      if (!preview.investors.length) return null;
+        const distributions = readCollection('distributions');
+        const ledger = readCollection('profitLedger');
 
-      const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
-      const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
+        // Ledger is the source of truth for whether this cycle was paid — check it
+        // before creating a distribution record to prevent duplicate credits.
+        const cycleLedger = ledger.filter(
+          e => e.scheduleId === scheduleId && e.cycleNumber === cycleNumber
+        );
+        if (cycleLedger.length > 0) {
+          return distributions.find(d => d._id === cycleLedger[0].distributionId)
+            || distributions.find(d => d.scheduleId === scheduleId && d.cycleNumber === cycleNumber)
+            || null;
+        }
 
-      const distribution = {
-        _id: generateId(),
-        projectId,
-        scheduleId,
-        cycleNumber,
-        cycleType,
-        periodStart,
-        periodEnd,
-        profitPerShare,
-        month,
-        year,
-        totalShares: preview.totalShares,
-        totalInvestors: preview.totalInvestors,
-        totalDistributed: preview.grandTotal,
-        status: 'completed',
-        createdBy: adminId,
-        distributionDate: distributionDate || now,
-        createdAt: now
-      };
-      distributions.push(distribution);
-      writeCollection('distributions', distributions);
+        let distribution = distributions.find(
+          d => d.scheduleId === scheduleId && d.cycleNumber === cycleNumber
+        );
 
-      const ledger = readCollection('profitLedger');
-      for (const inv of preview.investors) {
-        for (const invDetail of inv.investments) {
-          const profit = invDetail.shares * profitPerShare;
-          ledger.push({
+        const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
+        const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
+
+        if (!distribution) {
+          distribution = {
             _id: generateId(),
-            distributionId: distribution._id,
-            investorId: inv.investorId,
             projectId,
-            investmentId: invDetail.investmentId,
-            shares: invDetail.shares,
-            profitPerShare,
-            calculatedProfit: profit,
-            month,
-            year,
+            scheduleId,
             cycleNumber,
             cycleType,
             periodStart,
             periodEnd,
+            profitPerShare,
+            month,
+            year,
+            totalShares: preview.totalShares,
+            totalInvestors: preview.totalInvestors,
+            totalDistributed: preview.grandTotal,
+            status: 'completed',
+            createdBy: adminId,
+            distributionDate: distributionDate || now,
             createdAt: now
-          });
+          };
+          distributions.push(distribution);
+          writeCollection('distributions', distributions);
         }
-      }
-      writeCollection('profitLedger', ledger);
 
-      const wallets = readCollection('wallets');
-      const investments = readCollection('investments');
-
-      for (const inv of preview.investors) {
-        let walletIdx = wallets.findIndex(w => w.investorId === inv.investorId);
-        if (walletIdx === -1) {
-          wallets.push({
-            _id: generateId(),
-            investorId: inv.investorId,
-            availableBalance: 0,
-            pendingBalance: 0,
-            withdrawnBalance: 0,
-            createdAt: now,
-            updatedAt: now
-          });
-          walletIdx = wallets.length - 1;
-        }
-        wallets[walletIdx].availableBalance = (Number(wallets[walletIdx].availableBalance) || 0) + inv.calculatedProfit;
-        wallets[walletIdx].updatedAt = now;
-
-        for (const invDetail of inv.investments) {
-          const profit = invDetail.shares * profitPerShare;
-          const invIdx = investments.findIndex(i => i._id === invDetail.investmentId);
-          if (invIdx !== -1) {
-            investments[invIdx].returnEarned = (Number(investments[invIdx].returnEarned) || 0) + profit;
-            investments[invIdx].profitNotAssigned = false;
-            investments[invIdx].paymentHistory = investments[invIdx].paymentHistory || [];
-            investments[invIdx].paymentHistory.push({
-              type: 'profit_distribution',
-              label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
-              amount: profit,
-              date: now
+        for (const inv of preview.investors) {
+          for (const invDetail of inv.investments) {
+            const profit = invDetail.shares * profitPerShare;
+            ledger.push({
+              _id: generateId(),
+              distributionId: distribution._id,
+              scheduleId,
+              investorId: inv.investorId,
+              projectId,
+              investmentId: invDetail.investmentId,
+              shares: invDetail.shares,
+              profitPerShare,
+              calculatedProfit: profit,
+              month,
+              year,
+              cycleNumber,
+              cycleType,
+              periodStart,
+              periodEnd,
+              createdAt: now
             });
           }
         }
-      }
-      writeCollection('wallets', wallets);
-      writeCollection('investments', investments);
+        writeCollection('profitLedger', ledger);
 
-      const auditLogs = readCollection('auditLog');
-      auditLogs.push({
-        _id: generateId(),
-        action: 'profit_distribution',
-        performedBy: adminId,
-        metadata: {
-          distributionId: distribution._id,
-          scheduleId,
-          cycleNumber,
-          cycleType,
-          periodStart,
-          periodEnd,
-          projectId,
-          profitPerShare,
-          month,
-          year,
-          distributionDate: distributionDate || now,
-          totalInvestors: preview.totalInvestors,
-          totalShares: preview.totalShares,
-          totalDistributed: preview.grandTotal
-        },
-        createdAt: now
+        const wallets = readCollection('wallets');
+        const investments = readCollection('investments');
+
+        for (const inv of preview.investors) {
+          let walletIdx = wallets.findIndex(w => w.investorId === inv.investorId);
+          if (walletIdx === -1) {
+            wallets.push({
+              _id: generateId(),
+              investorId: inv.investorId,
+              availableBalance: 0,
+              pendingBalance: 0,
+              withdrawnBalance: 0,
+              createdAt: now,
+              updatedAt: now
+            });
+            walletIdx = wallets.length - 1;
+          }
+          wallets[walletIdx].availableBalance = (Number(wallets[walletIdx].availableBalance) || 0) + inv.calculatedProfit;
+          wallets[walletIdx].updatedAt = now;
+
+          for (const invDetail of inv.investments) {
+            const profit = invDetail.shares * profitPerShare;
+            const invIdx = investments.findIndex(i => i._id === invDetail.investmentId);
+            if (invIdx !== -1) {
+              investments[invIdx].returnEarned = (Number(investments[invIdx].returnEarned) || 0) + profit;
+              investments[invIdx].profitNotAssigned = false;
+              investments[invIdx].paymentHistory = investments[invIdx].paymentHistory || [];
+              investments[invIdx].paymentHistory.push({
+                type: 'profit_distribution',
+                label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
+                amount: profit,
+                date: now
+              });
+            }
+          }
+        }
+        writeCollection('wallets', wallets);
+        writeCollection('investments', investments);
+
+        const auditLogs = readCollection('auditLog');
+        if (!auditLogs.some(l => l.metadata?.distributionId === distribution._id)) {
+          auditLogs.push({
+            _id: generateId(),
+            action: 'profit_distribution',
+            performedBy: adminId,
+            metadata: {
+              distributionId: distribution._id,
+              scheduleId,
+              cycleNumber,
+              cycleType,
+              periodStart,
+              periodEnd,
+              projectId,
+              profitPerShare,
+              month,
+              year,
+              distributionDate: distributionDate || now,
+              totalInvestors: preview.totalInvestors,
+              totalShares: preview.totalShares,
+              totalDistributed: preview.grandTotal
+            },
+            createdAt: now
+          });
+          writeCollection('auditLog', auditLogs);
+        }
+
+        return distribution;
       });
-      writeCollection('auditLog', auditLogs);
-
-      return distribution;
     },
 
     find: async (query = {}) => {
@@ -1213,26 +1246,59 @@ const DB = {
 
     getInvestorSummary: async (investorId) => {
       const entries = readCollection('profitLedger').filter(e => e.investorId === investorId);
+      const investments = readCollection('investments').filter(i => i.investorId === investorId);
       const wallets = readCollection('wallets');
       const wallet = wallets.find(w => w.investorId === investorId);
 
-      const totalEarned = entries.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+      const earnedFromLedger = entries.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+      const earnedFromInvestments = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
+      const totalEarned = Math.max(earnedFromLedger, earnedFromInvestments);
 
       const projectMap = new Map();
-      for (const e of entries) {
-        const existing = projectMap.get(e.projectId);
+
+      // Investments are the source of truth for current share holdings.
+      for (const inv of investments) {
+        if (!['active', 'completed'].includes(inv.status)) continue;
+        const pid = inv.projectId;
+        const shares = Number(inv.sharesCount) || 0;
+        if (shares <= 0) continue;
+        const existing = projectMap.get(pid);
         if (existing) {
-          existing.totalProfit += Number(e.calculatedProfit) || 0;
-          existing.totalShares += Number(e.shares) || 0;
-          existing.distributions += 1;
+          existing.totalShares += shares;
+          existing.totalProfit += Number(inv.returnEarned) || 0;
         } else {
-          projectMap.set(e.projectId, {
-            projectId: e.projectId,
-            totalProfit: Number(e.calculatedProfit) || 0,
-            totalShares: Number(e.shares) || 0,
-            distributions: 1
+          projectMap.set(pid, {
+            projectId: pid,
+            totalProfit: Number(inv.returnEarned) || 0,
+            totalShares: shares,
+            distributions: 0,
+            ledgerProfit: 0
           });
         }
+      }
+
+      // Ledger tracks credited profit and distribution count — not share holdings.
+      for (const e of entries) {
+        let entry = projectMap.get(e.projectId);
+        if (!entry) {
+          entry = {
+            projectId: e.projectId,
+            totalProfit: 0,
+            totalShares: 0,
+            distributions: 0,
+            ledgerProfit: 0
+          };
+          projectMap.set(e.projectId, entry);
+        }
+        entry.ledgerProfit += Number(e.calculatedProfit) || 0;
+        entry.distributions += 1;
+      }
+
+      for (const entry of projectMap.values()) {
+        entry.totalProfit = Math.max(entry.totalProfit, entry.ledgerProfit || 0);
+        delete entry.ledgerProfit;
       }
 
       const projects = readCollection('projects');

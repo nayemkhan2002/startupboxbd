@@ -1,0 +1,40 @@
+[
+  {
+    "_id": "nf6lip1e4msn2rlep",
+    "projectId": "9k3patj28msn2rle7",
+    "scheduleId": "1cnfdufeomsn2rleh",
+    "cycleNumber": 1,
+    "cycleType": "weekly",
+    "periodStart": "2026-08-03",
+    "periodEnd": "2026-08-09",
+    "profitPerShare": 323,
+    "month": 8,
+    "year": 2026,
+    "totalShares": 1,
+    "totalInvestors": 1,
+    "totalDistributed": 323,
+    "status": "completed",
+    "createdBy": "system",
+    "distributionDate": "2026-08-09",
+    "createdAt": "2026-08-09T00:00:00.000Z"
+  },
+  {
+    "_id": "vik72xmylmsn2rlf5",
+    "projectId": "q4xugzadimsn2rle5",
+    "scheduleId": "qn7ef2a2nmsn2rlef",
+    "cycleNumber": 1,
+    "cycleType": "weekly",
+    "periodStart": "2026-08-03",
+    "periodEnd": "2026-08-09",
+    "profitPerShare": 367,
+    "month": 8,
+    "year": 2026,
+    "totalShares": 4,
+    "totalInvestors": 1,
+    "totalDistributed": 1468,
+    "status": "completed",
+    "createdBy": "system",
+    "distributionDate": "2026-08-09",
+    "createdAt": "2026-08-09T00:00:00.000Z"
+  }
+]

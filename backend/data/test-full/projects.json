@@ -1,0 +1,38 @@
+[
+  {
+    "_id": "q4xugzadimsn2rle5",
+    "title": "Project A",
+    "category": "Farm",
+    "thumbnail": "",
+    "targetAmount": 0,
+    "sharePrice": 0,
+    "raisedAmount": 4000,
+    "totalShares": 0,
+    "duration": "",
+    "riskLevel": "Medium",
+    "expectedROI": "N/A",
+    "teamInfo": "",
+    "milestones": [],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-08-10T10:14:44.237Z"
+  },
+  {
+    "_id": "9k3patj28msn2rle7",
+    "title": "Project B",
+    "category": "Food",
+    "thumbnail": "",
+    "targetAmount": 0,
+    "sharePrice": 0,
+    "raisedAmount": 1000,
+    "totalShares": 0,
+    "duration": "",
+    "riskLevel": "Medium",
+    "expectedROI": "N/A",
+    "teamInfo": "",
+    "milestones": [],
+    "documents": [],
+    "status": "open",
+    "createdAt": "2026-08-10T10:14:44.239Z"
+  }
+]

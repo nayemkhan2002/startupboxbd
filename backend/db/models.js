@@ -171,6 +171,7 @@ const profitScheduleSchema = new mongoose.Schema({
 const investorProfitLedgerSchema = new mongoose.Schema({
   _id: idField,
   distributionId: { type: String, required: true, index: true },
+  scheduleId: { type: String, index: true },
   investorId: { type: String, required: true, index: true },
   projectId: { type: String, required: true, index: true },
   investmentId: { type: String, index: true },
@@ -179,8 +180,17 @@ const investorProfitLedgerSchema = new mongoose.Schema({
   calculatedProfit: { type: Number, required: true },
   month: { type: Number },
   year: { type: Number },
+  cycleNumber: { type: Number },
+  cycleType: { type: String },
+  periodStart: { type: String },
+  periodEnd: { type: String },
   createdAt: String
 }, opts);
+
+investorProfitLedgerSchema.index(
+  { scheduleId: 1, cycleNumber: 1, investmentId: 1 },
+  { unique: true, partialFilterExpression: { scheduleId: { $exists: true, $ne: null } } }
+);
 
 const auditLogSchema = new mongoose.Schema({
   _id: idField,

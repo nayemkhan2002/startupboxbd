@@ -63,6 +63,7 @@ const reconcileDistributionIndexes = async () => {
       }
     }
     await ProfitDistribution.createIndexes();
+    await InvestorProfitLedger.createIndexes();
   } catch (err) {
     console.warn('Profit distribution index reconciliation skipped:', err.message);
   }
@@ -93,14 +94,13 @@ const initDb = async () => {
     });
     console.log(`Seeded Admin user (${adminEmail})`);
   } else {
-    // Verify existing admin password is correct; reset if it doesn't match.
     const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
     if (!passwordOk) {
       await User.updateOne(
         { email: adminEmail },
         { $set: { password: await bcrypt.hash(adminPassword, 10) } }
       );
-      console.log(`Admin password was out of sync — reset to match ADMIN_PASSWORD / default.`);
+      console.log('Admin password was out of sync — reset to match ADMIN_PASSWORD / default.');
     }
   }
 
@@ -705,6 +705,130 @@ const DB = {
     findByIdAndDelete: async (id) => ProfitImage.findByIdAndDelete(id).lean()
   },
 
+  // Idempotent investor crediting for a scheduled distribution record.
+  _creditScheduledCycleInvestors: async (distribution, preview, payload, session = null) => {
+    const {
+      projectId, profitPerShare, cycleNumber, cycleType,
+      periodStart, periodEnd, month, year, adminId, distributionDate, scheduleId
+    } = payload;
+    const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
+    const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
+
+    const run = async (sess) => {
+      const cycleCredited = await InvestorProfitLedger.findOne({ scheduleId, cycleNumber })
+        .session(sess)
+        .lean();
+      if (cycleCredited) return;
+
+      const existingLedger = await InvestorProfitLedger.find({ distributionId: distribution._id })
+        .session(sess)
+        .lean();
+      if (existingLedger.length > 0) return;
+
+      const ledgerDocs = [];
+      for (const inv of preview.investors) {
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          ledgerDocs.push({
+            distributionId: distribution._id,
+            scheduleId,
+            investorId: inv.investorId,
+            projectId,
+            investmentId: invDetail.investmentId,
+            shares: invDetail.shares,
+            profitPerShare,
+            calculatedProfit: profit,
+            month,
+            year,
+            cycleNumber,
+            cycleType,
+            periodStart,
+            periodEnd,
+            createdAt: now
+          });
+        }
+      }
+      await InvestorProfitLedger.insertMany(ledgerDocs, { session: sess });
+
+      for (const inv of preview.investors) {
+        await Wallet.updateOne(
+          { investorId: inv.investorId },
+          {
+            $inc: { availableBalance: inv.calculatedProfit },
+            $set: { updatedAt: now },
+            $setOnInsert: {
+              investorId: inv.investorId,
+              pendingBalance: 0,
+              withdrawnBalance: 0,
+              createdAt: now
+            }
+          },
+          { upsert: true, session: sess }
+        );
+
+        for (const invDetail of inv.investments) {
+          const profit = invDetail.shares * profitPerShare;
+          await Investment.updateOne(
+            { _id: invDetail.investmentId },
+            {
+              $inc: { returnEarned: profit },
+              $set: { profitNotAssigned: false },
+              $push: {
+                paymentHistory: {
+                  type: 'profit_distribution',
+                  label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
+                  amount: profit,
+                  date: now
+                }
+              }
+            },
+            { session: sess }
+          );
+        }
+      }
+
+      const auditExists = await AuditLog.findOne({
+        action: 'profit_distribution',
+        'metadata.distributionId': distribution._id
+      }).session(sess).lean();
+      if (!auditExists) {
+        await AuditLog.create([{
+          action: 'profit_distribution',
+          performedBy: adminId,
+          metadata: {
+            distributionId: distribution._id,
+            scheduleId,
+            cycleNumber,
+            cycleType,
+            periodStart,
+            periodEnd,
+            projectId,
+            profitPerShare,
+            month,
+            year,
+            distributionDate: distributionDate || now,
+            totalInvestors: preview.totalInvestors,
+            totalShares: preview.totalShares,
+            totalDistributed: preview.grandTotal
+          },
+          createdAt: now
+        }], { session: sess });
+      }
+    };
+
+    if (session) {
+      await run(session);
+      return;
+    }
+
+    const ownSession = await mongoose.startSession();
+    try {
+      await ownSession.withTransaction(() => run(ownSession));
+    } finally {
+      await ownSession.endSession();
+    }
+  },
+
   // ─── Profit Distribution System ─────────────────────────────
   distributions: {
     /**
@@ -906,16 +1030,23 @@ const DB = {
         periodStart, periodEnd, month, year, adminId, distributionDate
       } = payload;
 
-      const existing = await ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
-      if (existing) return existing;
-
       const preview = await DB.distributions.preview(projectId, profitPerShare);
-      // A project with no share-holding investors is a valid no-op: the cycle is
-      // still consumed so the schedule keeps advancing instead of retrying forever.
       if (!preview.investors.length) return null;
 
+      // Ledger is the source of truth — if this cycle was already paid, return
+      // immediately without creating another distribution record.
+      const cycleCredited = await InvestorProfitLedger.findOne({ scheduleId, cycleNumber }).lean();
+      if (cycleCredited) {
+        return ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
+      }
+
+      const existing = await ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
+      if (existing) {
+        await DB._creditScheduledCycleInvestors(existing, preview, payload);
+        return existing;
+      }
+
       const now = distributionDate ? new Date(distributionDate).toISOString() : new Date().toISOString();
-      const cycleLabel = cycleType === 'monthly' ? 'Monthly' : 'Weekly';
       const session = await mongoose.startSession();
       let distribution;
 
@@ -940,98 +1071,17 @@ const DB = {
             createdAt: now
           }], { session });
           distribution = distDoc.toObject();
-
-          const ledgerDocs = [];
-          for (const inv of preview.investors) {
-            for (const invDetail of inv.investments) {
-              const profit = invDetail.shares * profitPerShare;
-              ledgerDocs.push({
-                distributionId: distribution._id,
-                investorId: inv.investorId,
-                projectId,
-                investmentId: invDetail.investmentId,
-                shares: invDetail.shares,
-                profitPerShare,
-                calculatedProfit: profit,
-                month,
-                year,
-                cycleNumber,
-                cycleType,
-                periodStart,
-                periodEnd,
-                createdAt: now
-              });
-            }
-          }
-          await InvestorProfitLedger.insertMany(ledgerDocs, { session });
-
-          for (const inv of preview.investors) {
-            await Wallet.updateOne(
-              { investorId: inv.investorId },
-              {
-                $inc: { availableBalance: inv.calculatedProfit },
-                $set: { updatedAt: now },
-                $setOnInsert: {
-                  investorId: inv.investorId,
-                  pendingBalance: 0,
-                  withdrawnBalance: 0,
-                  createdAt: now
-                }
-              },
-              { upsert: true, session }
-            );
-
-            for (const invDetail of inv.investments) {
-              const profit = invDetail.shares * profitPerShare;
-              await Investment.updateOne(
-                { _id: invDetail.investmentId },
-                {
-                  $inc: { returnEarned: profit },
-                  $set: { profitNotAssigned: false },
-                  $push: {
-                    paymentHistory: {
-                      type: 'profit_distribution',
-                      label: `${cycleLabel} Profit — Cycle ${cycleNumber} (${periodStart} → ${periodEnd})`,
-                      amount: profit,
-                      date: now
-                    }
-                  }
-                },
-                { session }
-              );
-            }
-          }
-
-          await AuditLog.create([{
-            action: 'profit_distribution',
-            performedBy: adminId,
-            metadata: {
-              distributionId: distribution._id,
-              scheduleId,
-              cycleNumber,
-              cycleType,
-              periodStart,
-              periodEnd,
-              projectId,
-              profitPerShare,
-              month,
-              year,
-              distributionDate: distributionDate || now,
-              totalInvestors: preview.totalInvestors,
-              totalShares: preview.totalShares,
-              totalDistributed: preview.grandTotal
-            },
-            createdAt: now
-          }], { session });
+          await DB._creditScheduledCycleInvestors(distribution, preview, payload, session);
         });
       } catch (err) {
-        // A stale unique index or a concurrent run can reject the insert; if the
-        // cycle already landed, treat it as done rather than failing the caller.
         if (err && err.code === 11000) {
           const already = await ProfitDistribution.findOne({ scheduleId, cycleNumber }).lean();
-          if (already) return already;
+          if (already) {
+            await DB._creditScheduledCycleInvestors(already, preview, payload);
+            return already;
+          }
           console.warn(`Cycle ${cycleNumber} rejected by a duplicate-key index:`, err.message);
-          return null;
+          return undefined;
         }
         throw err;
       } finally {
@@ -1084,30 +1134,63 @@ const DB = {
     },
 
     getInvestorSummary: async (investorId) => {
-      const entries = await InvestorProfitLedger.find({ investorId }).lean();
-      const wallet = await Wallet.findOne({ investorId }).lean();
+      const [entries, investments, wallet] = await Promise.all([
+        InvestorProfitLedger.find({ investorId }).lean(),
+        Investment.find({ investorId }).lean(),
+        Wallet.findOne({ investorId }).lean()
+      ]);
 
-      const totalEarned = entries.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+      const earnedFromLedger = entries.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+      const earnedFromInvestments = investments
+        .filter(i => ['active', 'completed'].includes(i.status))
+        .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
+      const totalEarned = Math.max(earnedFromLedger, earnedFromInvestments);
 
-      // Per-project breakdown
       const projectMap = new Map();
-      for (const e of entries) {
-        const existing = projectMap.get(e.projectId);
+
+      // Investments are the source of truth for current share holdings.
+      for (const inv of investments) {
+        if (!['active', 'completed'].includes(inv.status)) continue;
+        const pid = inv.projectId;
+        const shares = Number(inv.sharesCount) || 0;
+        if (shares <= 0) continue;
+        const existing = projectMap.get(pid);
         if (existing) {
-          existing.totalProfit += Number(e.calculatedProfit) || 0;
-          existing.totalShares += Number(e.shares) || 0;
-          existing.distributions += 1;
+          existing.totalShares += shares;
+          existing.totalProfit += Number(inv.returnEarned) || 0;
         } else {
-          projectMap.set(e.projectId, {
-            projectId: e.projectId,
-            totalProfit: Number(e.calculatedProfit) || 0,
-            totalShares: Number(e.shares) || 0,
-            distributions: 1
+          projectMap.set(pid, {
+            projectId: pid,
+            totalProfit: Number(inv.returnEarned) || 0,
+            totalShares: shares,
+            distributions: 0,
+            ledgerProfit: 0
           });
         }
       }
 
-      // Populate project names
+      // Ledger tracks credited profit and distribution count — not share holdings.
+      for (const e of entries) {
+        let entry = projectMap.get(e.projectId);
+        if (!entry) {
+          entry = {
+            projectId: e.projectId,
+            totalProfit: 0,
+            totalShares: 0,
+            distributions: 0,
+            ledgerProfit: 0
+          };
+          projectMap.set(e.projectId, entry);
+        }
+        entry.ledgerProfit += Number(e.calculatedProfit) || 0;
+        entry.distributions += 1;
+      }
+
+      for (const entry of projectMap.values()) {
+        entry.totalProfit = Math.max(entry.totalProfit, entry.ledgerProfit || 0);
+        delete entry.ledgerProfit;
+      }
+
       const projectIds = Array.from(projectMap.keys());
       if (projectIds.length) {
         const projects = await Project.find({ _id: { $in: projectIds } }).lean();

@@ -13,7 +13,8 @@ require('dotenv').config();
 
 const mongoose = require('mongoose');
 const {
-  User, Project, Interest, Investment, Withdrawal, Payout
+  User, Project, Interest, Investment, Withdrawal, Payout,
+  ProfitDistribution, ProfitSchedule, InvestorProfitLedger, Wallet, AuditLog
 } = require('../db/models');
 
 const DRY_RUN = process.argv.includes('--dry-run');
@@ -28,7 +29,12 @@ const COLLECTIONS = [
   ['interests', Interest],
   ['investments', Investment],
   ['withdrawals', Withdrawal],
-  ['payouts', Payout]
+  ['payouts', Payout],
+  ['distributions', ProfitDistribution],
+  ['profitSchedules', ProfitSchedule],
+  ['profitLedger', InvestorProfitLedger],
+  ['wallets', Wallet],
+  ['auditLog', AuditLog]
 ];
 
 const readJson = (name) => {

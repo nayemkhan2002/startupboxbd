@@ -1,0 +1,55 @@
+[
+  {
+    "_id": "0170zzb3zmsn3coa4",
+    "investorId": "c7mprwczimsn3coa0",
+    "projectId": "32vhymb4amsn3coa3",
+    "amount": 1000,
+    "sharesCount": 4,
+    "roi": 0,
+    "duration": 0,
+    "durationUnit": "months",
+    "durationLabel": "",
+    "startDate": null,
+    "maturityDate": null,
+    "expectedReturn": 0,
+    "returnEarned": 1468,
+    "profitNotAssigned": false,
+    "status": "active",
+    "paymentHistory": [
+      {
+        "type": "investment",
+        "label": "Initial Investment Allocated",
+        "amount": 1000,
+        "date": "2026-08-10T10:31:07.756Z"
+      }
+    ],
+    "timeline": [
+      {
+        "key": "approved",
+        "label": "Investment Approved",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "started",
+        "label": "Business Started",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "profit",
+        "label": "Profit Generated",
+        "date": null,
+        "done": false
+      },
+      {
+        "key": "completed",
+        "label": "Completed",
+        "date": null,
+        "done": false
+      }
+    ],
+    "notes": "",
+    "createdAt": "2026-08-10T10:31:07.756Z"
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "q97wfbemfmsmc173c",
+    "distributionId": "u4maah9a0msmc173c",
+    "scheduleId": "pubzfgjc8msmc1739",
+    "investorId": "vtmetzar3msmc1732",
+    "projectId": "5kkaqz8s1msmc1734",
+    "investmentId": "8l28k4wycmsmc1736",
+    "shares": 4,
+    "profitPerShare": 100,
+    "calculatedProfit": 400,
+    "month": 8,
+    "year": 2026,
+    "cycleNumber": 1,
+    "cycleType": "weekly",
+    "periodStart": "2026-08-03",
+    "periodEnd": "2026-08-10",
+    "createdAt": "2026-08-10T00:00:00.000Z"
+  }
+]

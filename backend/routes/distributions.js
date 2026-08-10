@@ -7,10 +7,13 @@ const {
   enrichSchedule,
   processDueCycles,
   processDueCyclesSafe,
+  processDueCyclesOnce,
   getDueCycleNumbers,
   getNextDueDate,
+  getNextPeriodStart,
   CYCLE_DAYS
 } = require('../services/profitScheduleService');
+const { getInvestorDashboardBundle } = require('../services/profitCalculationService');
 
 const MONTH_NAMES = [
   '', 'January', 'February', 'March', 'April', 'May', 'June',
@@ -180,13 +183,29 @@ router.get('/detail/:id/ledger', protect, adminOnly, async (req, res) => {
   }
 });
 
+// Investor: unified dashboard bundle (processes due cycles once)
+router.get('/my/dashboard', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'investor' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    const investorId = req.user.role === 'admin' && req.query.investorId
+      ? req.query.investorId
+      : req.user._id;
+    const bundle = await getInvestorDashboardBundle(investorId, { adminId: 'system' });
+    res.json(bundle);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Investor: My profit ledger
 router.get('/my', protect, async (req, res) => {
   try {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCyclesSafe({ adminId: 'system' });
+    await processDueCyclesOnce({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
@@ -203,42 +222,19 @@ router.get('/my/summary', protect, async (req, res) => {
     if (req.user.role !== 'investor' && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized' });
     }
-    await processDueCyclesSafe({ adminId: 'system' });
+    await processDueCyclesOnce({ adminId: 'system' });
     const investorId = req.user.role === 'admin' && req.query.investorId
       ? req.query.investorId
       : req.user._id;
-    const summary = await DB.distributions.getInvestorSummary(investorId);
-
-    const activeSchedules = await DB.profitSchedules.find({ status: 'active' });
-    const upcoming = [];
-    for (const schedule of activeSchedules) {
-      const fresh = await DB.profitSchedules.findById(schedule._id);
-      if (!fresh || fresh.status !== 'active') continue;
-
-      const investments = await DB.investments.find({ investorId, projectId: fresh.projectId });
-      const investorShares = investments
-        .filter(i => ['active', 'completed'].includes(i.status))
-        .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
-      if (investorShares <= 0) continue;
-
-      const project = await DB.projects.findById(fresh.projectId);
-      const dueNow = getDueCycleNumbers(fresh).length > 0;
-      upcoming.push({
-        projectId: fresh.projectId,
-        projectTitle: project ? project.title : 'Project',
-        cycleType: fresh.cycleType,
-        cycleDays: CYCLE_DAYS[fresh.cycleType] || 7,
-        profitPerShare: fresh.profitPerShare,
-        investorShares,
-        expectedProfit: investorShares * Number(fresh.profitPerShare || 0),
-        nextDueDate: getNextDueDate(fresh),
-        nextCycleNumber: (fresh.cyclesProcessed || 0) + 1,
-        dueNow
-      });
-    }
-    summary.upcomingProfits = upcoming;
-
-    res.json(summary);
+    const bundle = await getInvestorDashboardBundle(investorId, { processCycles: false });
+    res.json({
+      totalEarned: bundle.totalEarned,
+      wallet: bundle.stats,
+      perProject: bundle.perProject,
+      monthly: bundle.monthly,
+      upcomingProfits: bundle.upcomingProfits,
+      projectBreakdown: bundle.projectBreakdown
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

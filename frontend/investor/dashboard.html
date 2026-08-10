@@ -77,11 +77,12 @@
                   <th>Your Shares</th>
                   <th>Earned So Far</th>
                   <th>Profit Schedule</th>
+                  <th>Current Cycle</th>
                   <th>Next Payout</th>
                 </tr>
               </thead>
               <tbody id="project-breakdown">
-                <tr><td colspan="5"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
+                <tr><td colspan="6"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -160,6 +161,12 @@
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/investor.js"></script>
   <script>
+    const formatDateOnly = (str) => {
+      if (!str) return '—';
+      const [y, m, d] = String(str).split('-');
+      return `${d}/${m}/${y}`;
+    };
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('investor');
       if (!user) return;
@@ -174,29 +181,27 @@
       const recentEl = document.getElementById('recent-investments');
       const interestsEl = document.getElementById('interests-container');
 
-      // Settled rather than all: a single failing panel must not blank the dashboard.
-      const [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes, summaryRes] = await Promise.allSettled([
-        apiFetch('/investments/stats'),
+      // One API call processes due cycles once and returns consistent profit data.
+      const [dashRes, investmentsRes, interestsRes, profileRes] = await Promise.allSettled([
+        apiFetch('/distributions/my/dashboard'),
         apiFetch('/investments/my'),
         apiFetch('/interest/my'),
-        apiFetch('/profile/me'),
-        apiFetch('/distributions/my'),
-        apiFetch('/distributions/my/summary')
+        apiFetch('/profile/me')
       ]);
 
-      const failures = [statsRes, investmentsRes, interestsRes, profileRes, ledgerRes, summaryRes]
-        .filter(r => r.status === 'rejected');
+      const failures = [dashRes, investmentsRes, interestsRes, profileRes].filter(r => r.status === 'rejected');
       if (failures.length) {
         console.error('Dashboard partial load failure:', failures.map(f => f.reason?.message));
         showToast(failures[0].reason?.message || 'Some data could not be loaded', 'error');
       }
 
-      const stats = statsRes.status === 'fulfilled' ? statsRes.value : null;
+      const dash = dashRes.status === 'fulfilled' ? dashRes.value : null;
+      const stats = dash ? dash.stats : null;
+      const profitLedger = dash ? dash.ledger : [];
+      const projectBreakdown = dash ? (dash.projectBreakdown || []) : [];
       const investments = investmentsRes.status === 'fulfilled' ? investmentsRes.value : [];
       const interests = interestsRes.status === 'fulfilled' ? interestsRes.value : [];
       const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
-      const profitLedger = ledgerRes.status === 'fulfilled' ? ledgerRes.value : [];
-      const summary = summaryRes.status === 'fulfilled' ? summaryRes.value : null;
 
       try {
         if (profile) {
@@ -208,55 +213,35 @@
           document.getElementById('kpi-invested').textContent = formatMoney(stats.totalInvested);
           document.getElementById('kpi-shares-hint').textContent = `Total Shares: ${Number(stats.totalShares || 0).toLocaleString()}`;
           document.getElementById('kpi-active').textContent = stats.activeInvestments;
-          document.getElementById('kpi-earned').textContent = formatMoney(stats.totalReturnEarned);
+          const totalEarned = Number(stats.totalReturnEarned) || 0;
+          document.getElementById('kpi-earned').textContent = formatMoney(totalEarned);
           document.getElementById('kpi-pending-wd').textContent = formatMoney(stats.pendingWithdrawals);
         }
 
-        // Shares are held per project and profit is credited per project, so a
-        // portfolio-wide share count alone cannot explain the earnings figure.
         const breakdownEl = document.getElementById('project-breakdown');
-        const holdings = new Map();
-        for (const inv of investments) {
-          if (!['active', 'completed'].includes(inv.status)) continue;
-          const shares = Number(inv.sharesCount) || 0;
-          if (shares <= 0) continue;
-          const pid = inv.projectId || inv.project?._id;
-          const existing = holdings.get(pid);
-          if (existing) {
-            existing.shares += shares;
-          } else {
-            holdings.set(pid, { shares, title: inv.project?.title || 'Project' });
-          }
-        }
-
-        const earnedByProject = new Map(
-          (summary?.perProject || []).map(p => [p.projectId, Number(p.totalProfit) || 0])
-        );
-        const scheduleByProject = new Map(
-          (summary?.upcomingProfits || []).map(s => [s.projectId, s])
-        );
-
-        if (!holdings.size) {
-          breakdownEl.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:18px;"><p>You do not hold shares in any project yet.</p></div></td></tr>`;
+        if (!projectBreakdown.length) {
+          breakdownEl.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:18px;"><p>You do not hold shares in any project yet.</p></div></td></tr>`;
         } else {
-          breakdownEl.innerHTML = Array.from(holdings.entries()).map(([pid, h]) => {
-            const earned = earnedByProject.get(pid) || 0;
-            const sched = scheduleByProject.get(pid);
-            const scheduleCell = sched
-              ? `<span class="inv-status inv-status-active">${escapeHtml(sched.cycleType)} · ${formatMoney(sched.profitPerShare)}/share</span>`
+          breakdownEl.innerHTML = projectBreakdown.map(p => {
+            const scheduleCell = p.profitSchedule
+              ? `<span class="inv-status inv-status-active">${escapeHtml(p.profitSchedule)}</span>`
               : `<span class="inv-status inv-status-pending">Not scheduled yet</span>`;
             let nextCell = '—';
-            if (sched) {
-              nextCell = sched.dueNow
+            if (p.nextPayoutDate) {
+              nextCell = p.dueNow
                 ? '<strong class="text-success">Due today</strong>'
-                : formatDate(sched.nextDueDate);
+                : formatDateOnly(p.nextPayoutDate);
             }
+            const cycleCell = p.currentCyclePeriod
+              ? `${escapeHtml(p.currentCyclePeriod)}${p.currentCycleNumber ? ` <small class="text-muted">(#${p.currentCycleNumber})</small>` : ''}`
+              : '—';
             return `
               <tr>
-                <td data-label="Project"><strong>${escapeHtml(h.title)}</strong></td>
-                <td data-label="Your Shares">${h.shares.toLocaleString()}</td>
-                <td data-label="Earned So Far" class="text-success"><strong>${formatMoney(earned)}</strong></td>
+                <td data-label="Project"><strong>${escapeHtml(p.projectTitle)}</strong></td>
+                <td data-label="Your Shares">${Number(p.shares).toLocaleString()}</td>
+                <td data-label="Earned So Far" class="text-success"><strong>${formatMoney(p.earnedSoFar)}</strong></td>
                 <td data-label="Profit Schedule">${scheduleCell}</td>
+                <td data-label="Current Cycle">${cycleCell}</td>
                 <td data-label="Next Payout">${nextCell}</td>
               </tr>`;
           }).join('');

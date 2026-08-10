@@ -1,0 +1,21 @@
+[
+  {
+    "_id": "u4maah9a0msmc173c",
+    "projectId": "5kkaqz8s1msmc1734",
+    "scheduleId": "pubzfgjc8msmc1739",
+    "cycleNumber": 1,
+    "cycleType": "weekly",
+    "periodStart": "2026-08-03",
+    "periodEnd": "2026-08-10",
+    "profitPerShare": 100,
+    "month": 8,
+    "year": 2026,
+    "totalShares": 4,
+    "totalInvestors": 1,
+    "totalDistributed": 400,
+    "status": "completed",
+    "createdBy": "admin",
+    "distributionDate": "2026-08-10",
+    "createdAt": "2026-08-10T00:00:00.000Z"
+  }
+]

@@ -1,0 +1,120 @@
+[
+  {
+    "_id": "scl8nyx17msn2rle9",
+    "investorId": "fhjr7lelvmsn2rle2",
+    "projectId": "q4xugzadimsn2rle5",
+    "amount": 4000,
+    "sharesCount": 4,
+    "roi": 0,
+    "duration": 0,
+    "durationUnit": "months",
+    "durationLabel": "",
+    "startDate": null,
+    "maturityDate": null,
+    "expectedReturn": 0,
+    "returnEarned": 1468,
+    "profitNotAssigned": false,
+    "status": "active",
+    "paymentHistory": [
+      {
+        "type": "investment",
+        "label": "Initial Investment Allocated",
+        "amount": 4000,
+        "date": "2026-08-10T10:14:44.241Z"
+      },
+      {
+        "type": "profit_distribution",
+        "label": "Weekly Profit — Cycle 1 (2026-08-03 → 2026-08-09)",
+        "amount": 1468,
+        "date": "2026-08-09T00:00:00.000Z"
+      }
+    ],
+    "timeline": [
+      {
+        "key": "approved",
+        "label": "Investment Approved",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "started",
+        "label": "Business Started",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "profit",
+        "label": "Profit Generated",
+        "date": null,
+        "done": false
+      },
+      {
+        "key": "completed",
+        "label": "Completed",
+        "date": null,
+        "done": false
+      }
+    ],
+    "notes": "",
+    "createdAt": "2026-08-10T10:14:44.241Z"
+  },
+  {
+    "_id": "xlx7nn7cfmsn2rlec",
+    "investorId": "fhjr7lelvmsn2rle2",
+    "projectId": "9k3patj28msn2rle7",
+    "amount": 1000,
+    "sharesCount": 1,
+    "roi": 0,
+    "duration": 0,
+    "durationUnit": "months",
+    "durationLabel": "",
+    "startDate": null,
+    "maturityDate": null,
+    "expectedReturn": 0,
+    "returnEarned": 323,
+    "profitNotAssigned": false,
+    "status": "active",
+    "paymentHistory": [
+      {
+        "type": "investment",
+        "label": "Initial Investment Allocated",
+        "amount": 1000,
+        "date": "2026-08-10T10:14:44.244Z"
+      },
+      {
+        "type": "profit_distribution",
+        "label": "Weekly Profit — Cycle 1 (2026-08-03 → 2026-08-09)",
+        "amount": 323,
+        "date": "2026-08-09T00:00:00.000Z"
+      }
+    ],
+    "timeline": [
+      {
+        "key": "approved",
+        "label": "Investment Approved",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "started",
+        "label": "Business Started",
+        "date": null,
+        "done": true
+      },
+      {
+        "key": "profit",
+        "label": "Profit Generated",
+        "date": null,
+        "done": false
+      },
+      {
+        "key": "completed",
+        "label": "Completed",
+        "date": null,
+        "done": false
+      }
+    ],
+    "notes": "",
+    "createdAt": "2026-08-10T10:14:44.244Z"
+  }
+]

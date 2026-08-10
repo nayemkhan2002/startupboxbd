@@ -1,0 +1,23 @@
+[
+  {
+    "_id": "vtmetzar3msmc1732",
+    "name": "Race",
+    "email": "race2@test.com",
+    "password": "$2b$10$mZFl0ryXuzY9Pa3liPNUW.rr1P0.vurieRKZegLl5yT3PaZKNkaXe",
+    "role": "investor",
+    "phone": "",
+    "address": "",
+    "profileImage": "",
+    "bankInfo": {
+      "method": "bkash",
+      "bkashNumber": "",
+      "bkashAccountType": "Personal",
+      "bankName": "",
+      "accountName": "",
+      "accountNumber": "",
+      "branch": "",
+      "routingNumber": ""
+    },
+    "createdAt": "2026-08-09T21:46:22.622Z"
+  }
+]

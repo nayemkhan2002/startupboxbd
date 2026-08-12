@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maturity / Payouts — Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .mat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+    .mat-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:#fff;cursor:pointer;transition:.15s}
+    .mat-card:hover,.mat-card.active{border-color:var(--gold,#d4a017);box-shadow:0 4px 14px rgba(0,0,0,.06)}
+    .mat-card .lbl{font-size:.78rem;color:var(--text-secondary);margin-bottom:6px}
+    .mat-card .val{font-size:1.5rem;font-weight:800;color:var(--navy)}
+    .mat-card.weekly .val{color:#dc2626}.mat-card.monthly .val{color:#d97706}.mat-card.custom .val{color:#2563eb}
+    .filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;align-items:flex-end}
+    .filters .form-group{margin:0;min-width:140px;flex:1}
+    .pay-overlay{display:none;position:fixed;inset:0;background:rgba(10,15,44,.55);z-index:2000;backdrop-filter:blur(4px);padding:24px;overflow-y:auto}
+    .pay-overlay.open{display:flex;align-items:center;justify-content:center}
+    .pay-box{background:#fff;border-radius:var(--radius-lg);padding:28px;max-width:540px;width:100%;border:1px solid var(--border)}
+    .pay-detail{background:var(--bg-subtle);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:.88rem;line-height:1.7}
+    .status-pill{display:inline-block;padding:3px 8px;border-radius:999px;font-size:.72rem;font-weight:700}
+    .status-pill.MATURED{background:rgba(217,119,6,.12);color:#b45309}
+    .status-pill.PAID{background:rgba(5,150,105,.12);color:#047857}
+    .status-pill.ACTIVE,.status-pill.UPCOMING{background:rgba(37,99,235,.1);color:#1d4ed8}
+    .pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:10px;flex-wrap:wrap}
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-profit.html"><span class="nav-icon">📊</span> Assign Profit</a>
+          <a href="/admin/distribution-history.html"><span class="nav-icon">📋</span> Distribution History</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/maturity.html" class="active"><span class="nav-icon">⏳</span> Maturity / Payouts <span class="maturity-nav-badges" id="maturity-nav-badges"></span></a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main-content">
+      <div class="admin-page-header">
+        <div class="flex gap-2" style="align-items:flex-start;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h2>Maturity / Payouts</h2>
+            <p>Report of matured investors. Pay them manually by bank transfer / bKash, then mark as paid with proof. No online payment gateway.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-banner" style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius);padding:14px 18px;margin-bottom:20px;font-size:0.9rem;color:var(--text-secondary);line-height:1.6;">
+        <strong style="color:var(--navy);">Manual payment only:</strong>
+        This page does <strong>not</strong> send money. Open the report → transfer via bank/bKash yourself → click
+        <strong>Mark Paid</strong> and save TxID / screenshot so the cycle is closed and not shown again.
+      </div>
+
+      <div class="mat-cards" id="mat-cards">
+        <div class="mat-card weekly active" data-type="weekly" data-status="MATURED">
+          <div class="lbl">Weekly Matured</div>
+          <div class="val" id="count-weekly">—</div>
+        </div>
+        <div class="mat-card monthly" data-type="monthly" data-status="MATURED">
+          <div class="lbl">Monthly Matured</div>
+          <div class="val" id="count-monthly">—</div>
+        </div>
+        <div class="mat-card custom" data-type="custom" data-status="MATURED">
+          <div class="lbl">Custom Matured</div>
+          <div class="val" id="count-custom">—</div>
+        </div>
+        <div class="mat-card" data-type="all" data-status="UPCOMING">
+          <div class="lbl">Upcoming</div>
+          <div class="val" id="count-upcoming">—</div>
+        </div>
+        <div class="mat-card" data-type="all" data-status="PAID">
+          <div class="lbl">Paid Today</div>
+          <div class="val" id="count-paid-today">—</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="filters">
+          <div class="form-group">
+            <label>Search investor</label>
+            <input type="text" id="filter-search" class="form-control" placeholder="Name, email, or ID">
+          </div>
+          <div class="form-group">
+            <label>Project</label>
+            <select id="filter-project" class="form-control"><option value="">All projects</option></select>
+          </div>
+          <div class="form-group">
+            <label>Sort</label>
+            <select id="filter-sort" class="form-control">
+              <option value="maturityDate:asc">Maturity date ↑</option>
+              <option value="maturityDate:desc">Maturity date ↓</option>
+              <option value="investorName:asc">Investor name</option>
+              <option value="profitAmount:desc">Profit amount</option>
+            </select>
+          </div>
+          <button type="button" class="btn" id="apply-filters">Apply</button>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Investor</th>
+                <th>Project</th>
+                <th>Shares</th>
+                <th>Investment</th>
+                <th>Profit / Share</th>
+                <th>Expected Profit</th>
+                <th>Start</th>
+                <th>Maturity</th>
+                <th>Days</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="maturity-table">
+              <tr><td colspan="11"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">
+          <span class="text-muted" id="page-info">—</span>
+          <div style="display:flex;gap:8px;">
+            <button type="button" class="btn btn-outline btn-sm" id="prev-page">Prev</button>
+            <button type="button" class="btn btn-outline btn-sm" id="next-page">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin:24px 0 12px;color:var(--navy);">Payoff History</h3>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Paid At</th>
+                <th>Investor</th>
+                <th>Project</th>
+                <th>Cycle</th>
+                <th>Type</th>
+                <th>Profit</th>
+                <th>Principal</th>
+                <th>Total</th>
+                <th>Method / Ref</th>
+              </tr>
+            </thead>
+            <tbody id="history-table">
+              <tr><td colspan="9"><div class="skeleton skeleton-line"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="pay-overlay" id="pay-overlay">
+    <div class="pay-box">
+      <h3 style="margin-bottom:12px;color:var(--navy);">Mark as Paid (after bank / bKash transfer)</h3>
+      <p style="font-size:.88rem;color:var(--text-secondary);margin-bottom:14px;">
+        Transfer the amount outside this system first, then record proof here. This only updates the report status — it does not process a payment online.
+      </p>
+      <div class="pay-detail" id="pay-detail"></div>
+      <div id="pay-error" class="error-msg" style="display:none;"></div>
+      <form id="pay-form">
+        <input type="hidden" id="pay-investment-id">
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select id="pay-method" class="form-control">
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="bKash">bKash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Reference / TxID</label>
+          <input type="text" id="pay-reference" class="form-control" placeholder="Required if no screenshot">
+        </div>
+        <div class="form-group">
+          <label>Transfer Screenshot</label>
+          <input type="file" id="pay-screenshot" class="form-control" accept="image/*,.pdf">
+        </div>
+        <div class="form-group" id="principal-wrap" style="display:none;">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:600;">
+            <input type="checkbox" id="pay-include-principal"> Include principal in payoff
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Note</label>
+          <textarea id="pay-note" class="form-control" rows="2"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button type="button" class="btn btn-outline" id="pay-cancel">Cancel</button>
+          <button type="submit" class="btn" id="pay-submit">Save — Mark as Paid</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/investor.js"></script>
+  <script src="/assets/js/admin-maturity-badge.js"></script>
+  <script>
+    let state = {
+      type: 'weekly',
+      status: 'MATURED',
+      page: 1,
+      limit: 25,
+      selected: null
+    };
+
+    const loadCounts = async () => {
+      const c = await apiFetch('/maturity/counts');
+      document.getElementById('count-weekly').textContent = c.weeklyMatured;
+      document.getElementById('count-monthly').textContent = c.monthlyMatured;
+      document.getElementById('count-custom').textContent = c.customMatured;
+      document.getElementById('count-upcoming').textContent = c.upcoming;
+      document.getElementById('count-paid-today').textContent = c.paidToday;
+      return c;
+    };
+
+    const loadProjects = async () => {
+      const projects = await apiFetch('/projects');
+      const sel = document.getElementById('filter-project');
+      sel.innerHTML = '<option value="">All projects</option>' + projects.map(p =>
+        `<option value="${escapeHtml(p._id)}">${escapeHtml(p.title)}</option>`).join('');
+    };
+
+    const loadTable = async () => {
+      const tbody = document.getElementById('maturity-table');
+      const search = document.getElementById('filter-search').value.trim();
+      const projectId = document.getElementById('filter-project').value;
+      const [sortBy, sortDir] = document.getElementById('filter-sort').value.split(':');
+      const qs = new URLSearchParams({
+        maturityType: state.type,
+        status: state.status,
+        page: String(state.page),
+        limit: String(state.limit),
+        sortBy,
+        sortDir,
+        search,
+        projectId
+      });
+      try {
+        const data = await apiFetch(`/maturity?${qs}`);
+        const items = data.items || [];
+        if (!items.length) {
+          tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><h3>No records</h3><p>No investments match this maturity filter.</p></div></td></tr>`;
+        } else {
+          tbody.innerHTML = items.map(r => `
+            <tr>
+              <td><strong>${escapeHtml(r.investorName)}</strong><br><small class="text-muted">${escapeHtml(r.investorEmail)}<br>ID: ${escapeHtml(r.investorId)}</small></td>
+              <td>${escapeHtml(r.projectTitle)}</td>
+              <td><strong>${Number(r.shares).toLocaleString()}</strong></td>
+              <td>${formatMoney(r.investmentAmount)}</td>
+              <td>${formatMoney(r.profitPerShare)}</td>
+              <td class="text-success"><strong>${formatMoney(r.profitAmount)}</strong></td>
+              <td>${escapeHtml(r.maturityStartDate || '—')}</td>
+              <td><strong>${escapeHtml(r.maturityDate || '—')}</strong></td>
+              <td>${r.isMatured ? (r.daysMatured || 0) + 'd overdue' : (r.daysRemaining || 0) + 'd left'}</td>
+              <td><span class="status-pill ${escapeHtml(r.maturityStatus)}">${escapeHtml(r.maturityStatus)}</span></td>
+              <td>
+                <div class="action-btns">
+                  <a class="btn btn-outline btn-sm" href="/admin/investor-detail.html?id=${encodeURIComponent(r.investorId)}">View</a>
+                  ${r.isMatured && !r.isPaid ? `<button type="button" class="btn btn-sm payoff-btn" data-id="${escapeHtml(r.investmentId)}">Mark Paid</button>` : ''}
+                </div>
+              </td>
+            </tr>`).join('');
+        }
+        const p = data.pagination || {};
+        document.getElementById('page-info').textContent = `Page ${p.page || 1} of ${p.pages || 1} · ${p.total || 0} total`;
+        state.page = p.page || 1;
+        state._pages = p.pages || 1;
+        state._items = items;
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><h3>Failed to load</h3><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    };
+
+    const loadHistory = async () => {
+      const tbody = document.getElementById('history-table');
+      try {
+        const list = await apiFetch('/maturity/history');
+        if (!list.length) {
+          tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><h3>No payoff history yet</h3></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = list.slice(0, 50).map(p => `
+          <tr>
+            <td>${formatDate(p.paidAt)}</td>
+            <td><strong>${escapeHtml(p.investor?.name || '—')}</strong></td>
+            <td>${escapeHtml(p.project?.title || '—')}</td>
+            <td>#${p.cycleNumber}</td>
+            <td>${escapeHtml(p.maturityType)}</td>
+            <td class="text-success">${formatMoney(p.profitAmount)}</td>
+            <td>${formatMoney(p.principalAmount)}</td>
+            <td><strong>${formatMoney(p.totalPayoff)}</strong></td>
+            <td>${escapeHtml(p.paymentMethod || '')}<br><small class="text-muted">${escapeHtml(p.referenceNo || '')}</small></td>
+          </tr>`).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    };
+
+    const openPayoff = (row) => {
+      state.selected = row;
+      document.getElementById('pay-investment-id').value = row.investmentId;
+      document.getElementById('pay-error').style.display = 'none';
+      document.getElementById('pay-reference').value = '';
+      document.getElementById('pay-note').value = `Maturity cycle ${row.currentCycleNumber} · ${row.maturityDate}`;
+      document.getElementById('pay-screenshot').value = '';
+      const principalWrap = document.getElementById('principal-wrap');
+      const principalCheck = document.getElementById('pay-include-principal');
+      principalWrap.style.display = 'block';
+      principalCheck.checked = Boolean(row.includePrincipalOnPayoff);
+      const refreshDetail = () => {
+        const includePrincipal = principalCheck.checked;
+        const principal = includePrincipal ? (row.investmentAmount || 0) : 0;
+        const total = (row.profitAmount || 0) + principal;
+        document.getElementById('pay-detail').innerHTML = `
+          <strong>${escapeHtml(row.investorName)}</strong> · ${escapeHtml(row.investorEmail)}<br>
+          Project: <strong>${escapeHtml(row.projectTitle)}</strong><br>
+          Shares: <strong>${Number(row.shares).toLocaleString()}</strong> ·
+          Profit/share: <strong>${formatMoney(row.profitPerShare)}</strong><br>
+          Cycle: <strong>#${row.currentCycleNumber}</strong> ·
+          Maturity: <strong>${escapeHtml(row.maturityDate)}</strong><br>
+          Investment: <strong>${formatMoney(row.investmentAmount)}</strong><br>
+          Profit: <strong class="text-success">${formatMoney(row.profitAmount)}</strong><br>
+          Principal in payoff: <strong>${formatMoney(principal)}</strong><br>
+          <span style="font-size:1.05rem;">Total Payoff: <strong>${formatMoney(total)}</strong></span>`;
+      };
+      principalCheck.onchange = refreshDetail;
+      refreshDetail();
+      document.getElementById('pay-overlay').classList.add('open');
+    };
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      await Promise.all([loadCounts(), loadProjects(), loadTable(), loadHistory()]);
+
+      document.getElementById('mat-cards').addEventListener('click', async (e) => {
+        const card = e.target.closest('.mat-card');
+        if (!card) return;
+        document.querySelectorAll('.mat-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        state.type = card.dataset.type;
+        state.status = card.dataset.status;
+        state.page = 1;
+        await loadTable();
+      });
+
+      document.getElementById('apply-filters').addEventListener('click', async () => {
+        state.page = 1;
+        await loadTable();
+      });
+      document.getElementById('prev-page').addEventListener('click', async () => {
+        if (state.page > 1) { state.page -= 1; await loadTable(); }
+      });
+      document.getElementById('next-page').addEventListener('click', async () => {
+        if (state.page < (state._pages || 1)) { state.page += 1; await loadTable(); }
+      });
+
+      document.getElementById('maturity-table').addEventListener('click', (e) => {
+        const btn = e.target.closest('.payoff-btn');
+        if (!btn) return;
+        const row = (state._items || []).find(r => r.investmentId === btn.dataset.id);
+        if (row) openPayoff(row);
+      });
+
+      document.getElementById('pay-cancel').addEventListener('click', () => {
+        document.getElementById('pay-overlay').classList.remove('open');
+      });
+
+      document.getElementById('pay-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errEl = document.getElementById('pay-error');
+        const submitBtn = document.getElementById('pay-submit');
+        errEl.style.display = 'none';
+        submitBtn.disabled = true;
+        try {
+          let screenshotUrl = '';
+          const file = document.getElementById('pay-screenshot').files?.[0];
+          if (file) {
+            const formData = new FormData();
+            formData.append('screenshot', file);
+            const uploadRes = await apiFetch('/payouts/upload', { method: 'POST', body: formData });
+            screenshotUrl = uploadRes.screenshotUrl;
+          }
+          const referenceNo = document.getElementById('pay-reference').value.trim();
+          if (!referenceNo && !screenshotUrl) {
+            throw new Error('Provide a reference number or transfer screenshot');
+          }
+          await apiFetch('/maturity/payoff', {
+            method: 'POST',
+            body: JSON.stringify({
+              investmentId: document.getElementById('pay-investment-id').value,
+              paymentMethod: document.getElementById('pay-method').value,
+              referenceNo,
+              screenshotUrl,
+              notes: document.getElementById('pay-note').value.trim(),
+              includePrincipal: document.getElementById('pay-include-principal').checked,
+              confirm: true
+            })
+          });
+          showToast('Marked as paid — report updated', 'success');
+          document.getElementById('pay-overlay').classList.remove('open');
+          await Promise.all([loadCounts(), loadTable(), loadHistory()]);
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.style.display = 'block';
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

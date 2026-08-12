@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const {
   generateId, User, Project, Interest, Investment, Withdrawal, Payout, ProfitImage,
-  ProfitDistribution, ProfitSchedule, InvestorProfitLedger, AuditLog, Wallet
+  ProfitDistribution, ProfitSchedule, InvestorProfitLedger, AuditLog, Wallet, MaturityPayoff
 } = require('./models');
 
 const stripPassword = (user) => {
@@ -382,6 +382,13 @@ const DB = {
         new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
     },
     findById: async (id) => Investment.findById(id).lean(),
+    findMaturityEnabled: async (query = {}) => {
+      const q = { maturityEnabled: true, ...query };
+      if (query.maturityType) q.maturityType = query.maturityType;
+      if (query.projectId) q.projectId = query.projectId;
+      if (query.investorId) q.investorId = query.investorId;
+      return Investment.find(q).lean();
+    },
     create: async (payload) => {
       const amount = Number(payload.amount) || 0;
       const roi = Number(payload.roi) || 0;
@@ -429,7 +436,26 @@ const DB = {
           { key: 'completed', label: 'Completed', date: null, done: false }
         ],
         notes: payload.notes || '',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        // Opt-in maturity fields — only written when explicitly provided for NEW investments
+        ...(payload.maturityEnabled ? {
+          maturityEnabled: true,
+          maturityType: payload.maturityType,
+          maturityStartDate: payload.maturityStartDate || startDate,
+          nextMaturityDate: payload.nextMaturityDate || maturityDate,
+          customMaturityDate: payload.customMaturityDate || null,
+          maturityStatus: payload.maturityStatus || 'ACTIVE',
+          currentMaturityCycle: payload.currentMaturityCycle || 1,
+          maturityCyclesPaid: payload.maturityCyclesPaid || 0,
+          recurringMaturity: payload.recurringMaturity !== false,
+          includePrincipalOnPayoff: Boolean(payload.includePrincipalOnPayoff),
+          profitPerShareOverride: payload.profitPerShareOverride != null
+            ? Number(payload.profitPerShareOverride)
+            : undefined,
+          lastMaturedAt: payload.lastMaturedAt || null,
+          activatedAt: payload.activatedAt || new Date().toISOString(),
+          principalReturned: false
+        } : {})
       });
 
       // Atomic increment, unlike the old read-modify-write.
@@ -490,10 +516,11 @@ const DB = {
       });
     },
     getPortfolioStats: async (investorId) => {
-      const [investments, withdrawals, ledger] = await Promise.all([
+      const [investments, withdrawals, ledger, maturityPayoffs] = await Promise.all([
         Investment.find({ investorId }).lean(),
         Withdrawal.find({ investorId }).lean(),
-        InvestorProfitLedger.find({ investorId }).lean()
+        InvestorProfitLedger.find({ investorId }).lean(),
+        MaturityPayoff.find({ investorId, status: 'PAID' }).lean()
       ]);
 
       const totalInvested = investments
@@ -512,14 +539,20 @@ const DB = {
         .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
       const earnedFromLedger = ledger
         .reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
-      const totalReturnEarned = Math.max(earnedFromInvestments, earnedFromLedger);
+      const earnedFromMaturity = maturityPayoffs
+        .reduce((s, p) => s + (Number(p.profitAmount) || 0), 0);
+      const totalReturnEarned = Math.max(earnedFromInvestments, earnedFromLedger, earnedFromMaturity);
 
       const pendingWithdrawals = withdrawals
         .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
-      const totalWithdrawn = withdrawals
+      const withdrawnFromRequests = withdrawals
         .filter(w => w.status === 'completed')
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      // Maturity payoffs are paid externally by admin — count as already paid out
+      const withdrawnFromMaturity = maturityPayoffs
+        .reduce((s, p) => s + (Number(p.totalPayoff) || 0), 0);
+      const totalWithdrawn = withdrawnFromRequests + withdrawnFromMaturity;
 
       const availableBalance = Math.max(0, totalReturnEarned - totalWithdrawn - pendingWithdrawals);
 
@@ -1331,6 +1364,146 @@ const DB = {
         { $inc: { cyclesProcessed: 1 }, $set: { updatedAt: new Date().toISOString() } },
         { new: true }
       ).lean()
+  },
+
+  maturityPayoffs: {
+    find: async (query = {}) => {
+      const q = {};
+      if (query.investorId) q.investorId = query.investorId;
+      if (query.investmentId) q.investmentId = query.investmentId;
+      if (query.projectId) q.projectId = query.projectId;
+      if (query.status) q.status = query.status;
+      if (query.maturityType) q.maturityType = query.maturityType;
+      return MaturityPayoff.find(q).sort({ paidAt: -1 }).lean();
+    },
+    findOne: async (query = {}) => MaturityPayoff.findOne(query).lean(),
+    /**
+     * Atomic maturity payoff:
+     * ledger + investment update + returnEarned + payout receipt + audit.
+     * Unique index on (investmentId, cycleNumber) prevents duplicates.
+     */
+    createPayoffTransaction: async (payload) => {
+      const {
+        investment,
+        cycleNumber,
+        periodStart,
+        maturityDate,
+        shares,
+        profitPerShare,
+        principalAmount,
+        profitAmount,
+        totalPayoff,
+        paymentMethod,
+        referenceNo,
+        screenshotUrl,
+        notes,
+        adminId,
+        paidAt,
+        investmentUpdate
+      } = payload;
+
+      const session = await mongoose.startSession();
+      let usedTransaction = true;
+      try {
+        session.startTransaction();
+      } catch (_) {
+        usedTransaction = false;
+      }
+
+      const run = async (sess) => {
+        const findOpts = sess ? { session: sess } : {};
+        const dup = await MaturityPayoff.findOne({
+          investmentId: investment._id,
+          cycleNumber
+        }, null, findOpts);
+        if (dup) {
+          throw new Error('This maturity cycle has already been paid.');
+        }
+
+        const createOpts = sess ? { session: sess } : {};
+        const [ledgerDoc] = await MaturityPayoff.create([{
+          investmentId: investment._id,
+          investorId: investment.investorId,
+          projectId: investment.projectId,
+          cycleNumber,
+          maturityType: investment.maturityType,
+          periodStart,
+          maturityDate,
+          shares,
+          profitPerShare,
+          principalAmount,
+          profitAmount,
+          totalPayoff,
+          paymentMethod,
+          referenceNo: referenceNo || '',
+          screenshotUrl: screenshotUrl || '',
+          notes: notes || '',
+          status: 'PAID',
+          paidBy: adminId,
+          paidAt,
+          createdAt: paidAt
+        }], createOpts);
+
+        await Investment.updateOne(
+          { _id: investment._id },
+          { $set: investmentUpdate },
+          sess ? { session: sess } : {}
+        );
+
+        await Payout.create([{
+          investorId: investment.investorId,
+          investmentId: investment._id,
+          projectId: investment.projectId,
+          amount: totalPayoff,
+          monthYear: `Maturity C${cycleNumber}`,
+          paymentMethod,
+          referenceNo: referenceNo || '',
+          screenshotUrl: screenshotUrl || '',
+          notes: notes || `Maturity payoff cycle ${cycleNumber}`,
+          payoutType: 'maturity_payoff',
+          payoutDate: paidAt,
+          createdAt: paidAt
+        }], createOpts);
+
+        await AuditLog.create([{
+          action: 'maturity_payoff',
+          performedBy: adminId,
+          targetUserId: investment.investorId,
+          metadata: {
+            investmentId: investment._id,
+            projectId: investment.projectId,
+            cycleNumber,
+            profitAmount,
+            principalAmount,
+            totalPayoff,
+            maturityDate
+          },
+          createdAt: paidAt
+        }], createOpts);
+
+        return ledgerDoc;
+      };
+
+      try {
+        const ledgerDoc = await run(usedTransaction ? session : null);
+        if (usedTransaction) await session.commitTransaction();
+        const updated = await Investment.findById(investment._id).lean();
+        return {
+          payoff: ledgerDoc.toObject ? ledgerDoc.toObject() : ledgerDoc,
+          investment: updated
+        };
+      } catch (err) {
+        if (usedTransaction) {
+          try { await session.abortTransaction(); } catch (_) { /* ignore */ }
+        }
+        if (err && err.code === 11000) {
+          throw new Error('This maturity cycle has already been paid.');
+        }
+        throw err;
+      } finally {
+        session.endSession();
+      }
+    }
   },
 
   wallets: {

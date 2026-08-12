@@ -85,8 +85,25 @@ const investmentSchema = new mongoose.Schema({
   paymentHistory: { type: Array, default: [] },
   timeline: { type: Array, default: [] },
   notes: String,
-  createdAt: String
+  createdAt: String,
+  // Opt-in maturity tracking (NEW investments only — existing records leave these unset)
+  maturityEnabled: { type: Boolean, default: false, index: true },
+  maturityType: { type: String, index: true }, // weekly | monthly | custom
+  maturityStartDate: { type: String, index: true },
+  nextMaturityDate: { type: String, index: true },
+  customMaturityDate: String,
+  maturityStatus: { type: String, index: true }, // ACTIVE | UPCOMING | MATURED | PAID | CANCELLED
+  currentMaturityCycle: { type: Number, default: 0 },
+  maturityCyclesPaid: { type: Number, default: 0 },
+  recurringMaturity: { type: Boolean, default: true },
+  includePrincipalOnPayoff: { type: Boolean, default: false },
+  profitPerShareOverride: { type: Number },
+  lastMaturedAt: String,
+  activatedAt: String,
+  principalReturned: { type: Boolean, default: false }
 }, opts);
+
+investmentSchema.index({ maturityEnabled: 1, maturityStatus: 1, maturityType: 1, nextMaturityDate: 1 });
 
 const withdrawalSchema = new mongoose.Schema({
   _id: idField,
@@ -211,6 +228,36 @@ const walletSchema = new mongoose.Schema({
   createdAt: String
 }, opts);
 
+/** Immutable per-cycle maturity payoff ledger (duplicate-payment protected). */
+const maturityPayoffSchema = new mongoose.Schema({
+  _id: idField,
+  investmentId: { type: String, required: true, index: true },
+  investorId: { type: String, required: true, index: true },
+  projectId: { type: String, required: true, index: true },
+  cycleNumber: { type: Number, required: true },
+  maturityType: { type: String, required: true, index: true },
+  periodStart: String,
+  maturityDate: { type: String, index: true },
+  shares: { type: Number, default: 0 },
+  profitPerShare: { type: Number, default: 0 },
+  principalAmount: { type: Number, default: 0 },
+  profitAmount: { type: Number, default: 0 },
+  totalPayoff: { type: Number, default: 0 },
+  paymentMethod: String,
+  referenceNo: String,
+  screenshotUrl: String,
+  notes: String,
+  status: { type: String, default: 'PAID', index: true },
+  paidBy: { type: String, index: true },
+  paidAt: { type: String, index: true },
+  createdAt: String
+}, opts);
+
+maturityPayoffSchema.index(
+  { investmentId: 1, cycleNumber: 1 },
+  { unique: true }
+);
+
 module.exports = {
   generateId,
   User: mongoose.model('User', userSchema),
@@ -224,5 +271,6 @@ module.exports = {
   ProfitSchedule: mongoose.model('ProfitSchedule', profitScheduleSchema),
   InvestorProfitLedger: mongoose.model('InvestorProfitLedger', investorProfitLedgerSchema),
   AuditLog: mongoose.model('AuditLog', auditLogSchema),
-  Wallet: mongoose.model('Wallet', walletSchema)
+  Wallet: mongoose.model('Wallet', walletSchema),
+  MaturityPayoff: mongoose.model('MaturityPayoff', maturityPayoffSchema)
 };

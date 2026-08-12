@@ -29,6 +29,7 @@ app.use('/api/profile', require('./routes/profile'));
 app.use('/api/payouts', require('./routes/payouts'));
 app.use('/api/profit-images', require('./routes/profitImages'));
 app.use('/api/distributions', require('./routes/distributions'));
+app.use('/api/maturity', require('./routes/maturity'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Fallback for root

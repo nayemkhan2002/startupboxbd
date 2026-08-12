@@ -79,10 +79,11 @@
                   <th>Profit Schedule</th>
                   <th>Current Cycle</th>
                   <th>Next Payout</th>
+                  <th>Maturity</th>
                 </tr>
               </thead>
               <tbody id="project-breakdown">
-                <tr><td colspan="6"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
+                <tr><td colspan="7"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
               </tbody>
             </table>
           </div>
@@ -182,11 +183,12 @@
       const interestsEl = document.getElementById('interests-container');
 
       // One API call processes due cycles once and returns consistent profit data.
-      const [dashRes, investmentsRes, interestsRes, profileRes] = await Promise.allSettled([
+      const [dashRes, investmentsRes, interestsRes, profileRes, maturityRes] = await Promise.allSettled([
         apiFetch('/distributions/my/dashboard'),
         apiFetch('/investments/my'),
         apiFetch('/interest/my'),
-        apiFetch('/profile/me')
+        apiFetch('/profile/me'),
+        apiFetch('/maturity/my')
       ]);
 
       const failures = [dashRes, investmentsRes, interestsRes, profileRes].filter(r => r.status === 'rejected');
@@ -202,6 +204,12 @@
       const investments = investmentsRes.status === 'fulfilled' ? investmentsRes.value : [];
       const interests = interestsRes.status === 'fulfilled' ? interestsRes.value : [];
       const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
+      const maturityRows = maturityRes.status === 'fulfilled' ? (maturityRes.value || []) : [];
+      const maturityByProject = new Map();
+      maturityRows.forEach((m) => {
+        const prev = maturityByProject.get(m.projectId);
+        if (!prev || m.isMatured) maturityByProject.set(m.projectId, m);
+      });
 
       try {
         if (profile) {
@@ -227,7 +235,7 @@
 
         const breakdownEl = document.getElementById('project-breakdown');
         if (!projectBreakdown.length) {
-          breakdownEl.innerHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:18px;"><p>You do not hold shares in any project yet.</p></div></td></tr>`;
+          breakdownEl.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:18px;"><p>You do not hold shares in any project yet.</p></div></td></tr>`;
         } else {
           breakdownEl.innerHTML = projectBreakdown.map(p => {
             const scheduleCell = p.profitSchedule
@@ -242,6 +250,12 @@
             const cycleCell = p.currentCyclePeriod
               ? `${escapeHtml(p.currentCyclePeriod)}${p.currentCycleNumber ? ` <small class="text-muted">(#${p.currentCycleNumber})</small>` : ''}`
               : '—';
+            const mat = maturityByProject.get(p.projectId);
+            let maturityCell = '—';
+            if (mat) {
+              const statusLabel = mat.isPaid ? 'Paid' : (mat.isMatured ? 'Matured' : (mat.maturityStatus === 'UPCOMING' ? 'Upcoming' : 'Active'));
+              maturityCell = `<strong>${escapeHtml(statusLabel)}</strong><br><small class="text-muted">${escapeHtml(mat.maturityType || '')} · ${mat.maturityDate ? formatDateOnly(mat.maturityDate) : '—'}</small>`;
+            }
             return `
               <tr>
                 <td data-label="Project"><strong>${escapeHtml(p.projectTitle)}</strong></td>
@@ -253,6 +267,7 @@
                 <td data-label="Profit Schedule">${scheduleCell}</td>
                 <td data-label="Current Cycle">${cycleCell}</td>
                 <td data-label="Next Payout">${nextCell}</td>
+                <td data-label="Maturity">${maturityCell}</td>
               </tr>`;
           }).join('');
         }

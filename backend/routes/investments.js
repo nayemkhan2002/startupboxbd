@@ -4,6 +4,7 @@ const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
 const { buildProjectBreakdown } = require('../services/profitCalculationService');
+const { initMaturityFields } = require('../services/maturityService');
 
 // Investor: my investments
 router.get('/my', protect, async (req, res) => {
@@ -76,7 +77,12 @@ router.get('/:id', protect, async (req, res) => {
 // Admin: assign investment to investor
 router.post('/', protect, adminOnly, async (req, res) => {
   try {
-    const { investorId, projectId, amount, sharesCount, shares, roi, duration, durationUnit, durationLabel, startDate, status, notes, returnEarned, profitNotAssigned } = req.body;
+    const {
+      investorId, projectId, amount, sharesCount, shares, roi, duration, durationUnit,
+      durationLabel, startDate, status, notes, returnEarned, profitNotAssigned,
+      maturityEnabled, maturityType, maturityStartDate, customMaturityDate,
+      recurringMaturity, includePrincipalOnPayoff, profitPerShareOverride
+    } = req.body;
     if (!investorId || !projectId || !amount) {
       return res.status(400).json({ message: 'investorId, projectId and amount are required' });
     }
@@ -87,6 +93,20 @@ router.post('/', protect, adminOnly, async (req, res) => {
     const project = await DB.projects.findById(projectId);
     if (!project) return res.status(400).json({ message: 'Invalid project' });
 
+    let maturityFields = {};
+    if (maturityEnabled || maturityType) {
+      maturityFields = initMaturityFields({
+        maturityEnabled: true,
+        maturityType,
+        maturityStartDate: maturityStartDate || startDate,
+        startDate,
+        customMaturityDate,
+        recurringMaturity,
+        includePrincipalOnPayoff,
+        profitPerShareOverride
+      });
+    }
+
     const investment = await DB.investments.create({
       investorId,
       projectId,
@@ -96,11 +116,13 @@ router.post('/', protect, adminOnly, async (req, res) => {
       duration,
       durationUnit: durationUnit || 'months',
       durationLabel,
-      startDate: startDate || null,
+      startDate: maturityFields.startDate || startDate || null,
+      maturityDate: maturityFields.maturityDate || null,
       status: status || 'active',
       notes,
       returnEarned,
-      profitNotAssigned: Boolean(profitNotAssigned)
+      profitNotAssigned: Boolean(profitNotAssigned),
+      ...maturityFields
     });
     const [populated] = await DB.investments.populateAll([investment]);
     res.status(201).json(populated);

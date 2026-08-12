@@ -187,6 +187,46 @@
             </div>
           </div>
         </div>
+        <div class="form-group" style="border-top:1px solid var(--border);padding-top:14px;margin-top:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--navy);">
+            <input type="checkbox" id="maturityEnabled"> Enable Maturity Tracking (new investments only)
+          </label>
+          <small class="text-muted">Leave unchecked for legacy investments — existing investors are never auto-migrated.</small>
+        </div>
+        <div id="maturity-fields" style="display:none;">
+          <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+              <label>Maturity Type</label>
+              <select id="maturityType" class="form-control">
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:140px;">
+              <label>Maturity Start Date</label>
+              <input type="date" id="maturityStartDate" class="form-control">
+            </div>
+          </div>
+          <div class="form-group" id="custom-maturity-wrap" style="display:none;">
+            <label>Custom Maturity Date</label>
+            <input type="date" id="customMaturityDate" class="form-control">
+          </div>
+          <div class="form-group" style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+              <label>Profit Per Share Override <small class="text-muted">(optional)</small></label>
+              <input type="number" id="profitPerShareOverride" class="form-control" min="0" step="1" placeholder="Uses project schedule if empty">
+            </div>
+            <div style="flex:1;min-width:140px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;">
+              <label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin:0;">
+                <input type="checkbox" id="recurringMaturity" checked> Recurring cycles after payoff
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin:0;">
+                <input type="checkbox" id="includePrincipalOnPayoff"> Include principal on payoff
+              </label>
+            </div>
+          </div>
+        </div>
         <div class="form-group">
           <label>Notes (optional)</label>
           <textarea id="notes" class="form-control" rows="2"></textarea>
@@ -201,6 +241,7 @@
 
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/investor.js"></script>
+  <script src="/assets/js/admin-maturity-badge.js"></script>
   <script>
     let allInvestments = [];
 
@@ -365,6 +406,23 @@
         }
       });
 
+      const maturityEnabled = document.getElementById('maturityEnabled');
+      const maturityFields = document.getElementById('maturity-fields');
+      const maturityType = document.getElementById('maturityType');
+      const customWrap = document.getElementById('custom-maturity-wrap');
+      const syncMaturityUI = () => {
+        maturityFields.style.display = maturityEnabled.checked ? 'block' : 'none';
+        customWrap.style.display = maturityType.value === 'custom' ? 'block' : 'none';
+        if (maturityType.value === 'custom') {
+          document.getElementById('recurringMaturity').checked = false;
+          document.getElementById('includePrincipalOnPayoff').checked = true;
+        } else if (maturityEnabled.checked) {
+          document.getElementById('recurringMaturity').checked = true;
+        }
+      };
+      maturityEnabled.addEventListener('change', syncMaturityUI);
+      maturityType.addEventListener('change', syncMaturityUI);
+
       await loadTable();
 
       document.getElementById('assign-btn').addEventListener('click', () => {
@@ -380,6 +438,13 @@
         returnEarnedInput.value = '';
         returnEarnedInput.disabled = false;
         profitNotAssignedCheck.checked = false;
+        maturityEnabled.checked = false;
+        document.getElementById('maturityStartDate').value = '';
+        document.getElementById('customMaturityDate').value = '';
+        document.getElementById('profitPerShareOverride').value = '';
+        document.getElementById('recurringMaturity').checked = true;
+        document.getElementById('includePrincipalOnPayoff').checked = false;
+        syncMaturityUI();
         document.getElementById('error-msg').style.display = 'none';
         shareHint.style.display = 'none';
         modal.style.display = 'block';
@@ -412,6 +477,14 @@
           document.getElementById('duration').value = item.duration || '';
           document.getElementById('durationUnit').value = item.durationUnit || 'months';
           document.getElementById('startDate').value = item.startDate ? String(item.startDate).slice(0, 10) : '';
+          maturityEnabled.checked = Boolean(item.maturityEnabled);
+          document.getElementById('maturityType').value = item.maturityType || 'weekly';
+          document.getElementById('maturityStartDate').value = item.maturityStartDate ? String(item.maturityStartDate).slice(0, 10) : '';
+          document.getElementById('customMaturityDate').value = item.customMaturityDate ? String(item.customMaturityDate).slice(0, 10) : '';
+          document.getElementById('profitPerShareOverride').value = item.profitPerShareOverride != null ? item.profitPerShareOverride : '';
+          document.getElementById('recurringMaturity').checked = item.recurringMaturity !== false;
+          document.getElementById('includePrincipalOnPayoff').checked = Boolean(item.includePrincipalOnPayoff);
+          syncMaturityUI();
           document.getElementById('status').value = item.status || 'active';
 
           if (item.profitNotAssigned || item.returnEarned == null) {
@@ -468,12 +541,33 @@
           duration: durVal ? Number(durVal) : null,
           durationUnit: durUnit,
           durationLabel: durLabel,
-          startDate: document.getElementById('startDate').value || null,
+          startDate: document.getElementById('startDate').value || document.getElementById('maturityStartDate').value || null,
           status: document.getElementById('status').value,
           profitNotAssigned: isUnassigned,
           returnEarned: isUnassigned ? null : Number(returnEarnedInput.value),
           notes: document.getElementById('notes').value
         };
+
+        if (document.getElementById('maturityEnabled').checked) {
+          body.maturityEnabled = true;
+          body.maturityType = document.getElementById('maturityType').value;
+          body.maturityStartDate = document.getElementById('maturityStartDate').value || body.startDate;
+          body.customMaturityDate = document.getElementById('customMaturityDate').value || null;
+          body.recurringMaturity = document.getElementById('recurringMaturity').checked;
+          body.includePrincipalOnPayoff = document.getElementById('includePrincipalOnPayoff').checked;
+          const pps = document.getElementById('profitPerShareOverride').value;
+          if (pps !== '') body.profitPerShareOverride = Number(pps);
+          if (!body.maturityStartDate) {
+            errorDiv.textContent = 'Maturity start date is required when maturity tracking is enabled.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+          if (body.maturityType === 'custom' && !body.customMaturityDate) {
+            errorDiv.textContent = 'Custom maturity date is required.';
+            errorDiv.style.display = 'block';
+            return;
+          }
+        }
 
         try {
           btn.disabled = true;

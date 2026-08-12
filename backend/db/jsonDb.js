@@ -166,6 +166,7 @@ const initDb = async () => {
   readCollection('profitSchedules');
   readCollection('wallets');
   readCollection('auditLog');
+  readCollection('maturityPayoffs');
 };
 
 const DB = {
@@ -462,6 +463,13 @@ const DB = {
       const data = readCollection('investments');
       return data.find(i => i._id === id) || null;
     },
+    findMaturityEnabled: async (query = {}) => {
+      let data = readCollection('investments').filter(i => i.maturityEnabled && i.maturityType);
+      if (query.maturityType) data = data.filter(i => i.maturityType === query.maturityType);
+      if (query.projectId) data = data.filter(i => i.projectId === query.projectId);
+      if (query.investorId) data = data.filter(i => i.investorId === query.investorId);
+      return data;
+    },
     create: async (payload) => {
       const investments = readCollection('investments');
       const amount = Number(payload.amount) || 0;
@@ -518,6 +526,28 @@ const DB = {
         notes: payload.notes || '',
         createdAt: new Date().toISOString()
       };
+
+      if (payload.maturityEnabled) {
+        Object.assign(newItem, {
+          maturityEnabled: true,
+          maturityType: payload.maturityType,
+          maturityStartDate: payload.maturityStartDate || startDate,
+          nextMaturityDate: payload.nextMaturityDate || maturityDate,
+          customMaturityDate: payload.customMaturityDate || null,
+          maturityStatus: payload.maturityStatus || 'ACTIVE',
+          currentMaturityCycle: payload.currentMaturityCycle || 1,
+          maturityCyclesPaid: payload.maturityCyclesPaid || 0,
+          recurringMaturity: payload.recurringMaturity !== false,
+          includePrincipalOnPayoff: Boolean(payload.includePrincipalOnPayoff),
+          profitPerShareOverride: payload.profitPerShareOverride != null
+            ? Number(payload.profitPerShareOverride)
+            : undefined,
+          lastMaturedAt: payload.lastMaturedAt || null,
+          activatedAt: payload.activatedAt || new Date().toISOString(),
+          principalReturned: false
+        });
+      }
+
       investments.push(newItem);
       writeCollection('investments', investments);
 
@@ -590,6 +620,8 @@ const DB = {
       const investments = readCollection('investments').filter(i => i.investorId === investorId);
       const withdrawals = readCollection('withdrawals').filter(w => w.investorId === investorId);
       const ledger = readCollection('profitLedger').filter(e => e.investorId === investorId);
+      const maturityPayoffs = readCollection('maturityPayoffs')
+        .filter(p => p.investorId === investorId && p.status === 'PAID');
 
       const totalInvested = investments
         .filter(i => ['active', 'completed', 'pending'].includes(i.status))
@@ -607,14 +639,19 @@ const DB = {
         .reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
       const earnedFromLedger = ledger
         .reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
-      const totalReturnEarned = Math.max(earnedFromInvestments, earnedFromLedger);
+      const earnedFromMaturity = maturityPayoffs
+        .reduce((s, p) => s + (Number(p.profitAmount) || 0), 0);
+      const totalReturnEarned = Math.max(earnedFromInvestments, earnedFromLedger, earnedFromMaturity);
 
       const pendingWithdrawals = withdrawals
         .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
-      const totalWithdrawn = withdrawals
+      const withdrawnFromRequests = withdrawals
         .filter(w => w.status === 'completed')
         .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+      const withdrawnFromMaturity = maturityPayoffs
+        .reduce((s, p) => s + (Number(p.totalPayoff) || 0), 0);
+      const totalWithdrawn = withdrawnFromRequests + withdrawnFromMaturity;
 
       const availableBalance = Math.max(0, totalReturnEarned - totalWithdrawn - pendingWithdrawals);
 
@@ -1403,6 +1440,124 @@ const DB = {
       schedules[idx].updatedAt = new Date().toISOString();
       writeCollection('profitSchedules', schedules);
       return schedules[idx];
+    }
+  },
+
+  maturityPayoffs: {
+    find: async (query = {}) => {
+      let data = readCollection('maturityPayoffs');
+      if (query.investorId) data = data.filter(p => p.investorId === query.investorId);
+      if (query.investmentId) data = data.filter(p => p.investmentId === query.investmentId);
+      if (query.projectId) data = data.filter(p => p.projectId === query.projectId);
+      if (query.status) data = data.filter(p => p.status === query.status);
+      if (query.maturityType) data = data.filter(p => p.maturityType === query.maturityType);
+      return data.sort((a, b) => new Date(b.paidAt || b.createdAt) - new Date(a.paidAt || a.createdAt));
+    },
+    findOne: async (query = {}) => {
+      const data = readCollection('maturityPayoffs');
+      return data.find(p => {
+        for (const [k, v] of Object.entries(query)) {
+          if (p[k] !== v) return false;
+        }
+        return true;
+      }) || null;
+    },
+    createPayoffTransaction: async (payload) => {
+      const {
+        investment,
+        cycleNumber,
+        periodStart,
+        maturityDate,
+        shares,
+        profitPerShare,
+        principalAmount,
+        profitAmount,
+        totalPayoff,
+        paymentMethod,
+        referenceNo,
+        screenshotUrl,
+        notes,
+        adminId,
+        paidAt,
+        investmentUpdate
+      } = payload;
+
+      const list = readCollection('maturityPayoffs');
+      if (list.some(p => p.investmentId === investment._id && p.cycleNumber === cycleNumber)) {
+        throw new Error('This maturity cycle has already been paid.');
+      }
+
+      const payoff = {
+        _id: generateId(),
+        investmentId: investment._id,
+        investorId: investment.investorId,
+        projectId: investment.projectId,
+        cycleNumber,
+        maturityType: investment.maturityType,
+        periodStart,
+        maturityDate,
+        shares,
+        profitPerShare,
+        principalAmount,
+        profitAmount,
+        totalPayoff,
+        paymentMethod,
+        referenceNo: referenceNo || '',
+        screenshotUrl: screenshotUrl || '',
+        notes: notes || '',
+        status: 'PAID',
+        paidBy: adminId,
+        paidAt,
+        createdAt: paidAt
+      };
+      list.push(payoff);
+      writeCollection('maturityPayoffs', list);
+
+      try {
+        const updated = await DB.investments.findByIdAndUpdate(investment._id, investmentUpdate);
+
+        const payouts = readCollection('payouts');
+        payouts.push({
+          _id: generateId(),
+          investorId: investment.investorId,
+          investmentId: investment._id,
+          projectId: investment.projectId,
+          amount: totalPayoff,
+          monthYear: `Maturity C${cycleNumber}`,
+          paymentMethod,
+          referenceNo: referenceNo || '',
+          screenshotUrl: screenshotUrl || '',
+          notes: notes || `Maturity payoff cycle ${cycleNumber}`,
+          payoutType: 'maturity_payoff',
+          payoutDate: paidAt,
+          createdAt: paidAt
+        });
+        writeCollection('payouts', payouts);
+
+        const auditLogs = readCollection('auditLog');
+        auditLogs.push({
+          _id: generateId(),
+          action: 'maturity_payoff',
+          performedBy: adminId,
+          targetUserId: investment.investorId,
+          metadata: {
+            investmentId: investment._id,
+            projectId: investment.projectId,
+            cycleNumber,
+            profitAmount,
+            principalAmount,
+            totalPayoff,
+            maturityDate
+          },
+          createdAt: paidAt
+        });
+        writeCollection('auditLog', auditLogs);
+
+        return { payoff, investment: updated };
+      } catch (err) {
+        writeCollection('maturityPayoffs', list.filter(p => p._id !== payoff._id));
+        throw err;
+      }
     }
   },
 

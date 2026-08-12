@@ -94,6 +94,7 @@ router.post('/payoff', protect, adminOnly, async (req, res) => {
       screenshotUrl,
       notes,
       includePrincipal,
+      cycleNumber,
       confirm
     } = req.body;
 
@@ -108,7 +109,8 @@ router.post('/payoff', protect, adminOnly, async (req, res) => {
       referenceNo,
       screenshotUrl,
       notes,
-      includePrincipal
+      includePrincipal,
+      cycleNumber
     });
 
     res.status(201).json(result);

@@ -9,6 +9,8 @@ const {
   parseDateOnly,
   dateToIsoDate,
   addCalendarMonths,
+  getCyclePeriod,
+  getCompletedCycleCount,
   BD_TIMEZONE
 } = require('./profitScheduleService');
 
@@ -66,13 +68,11 @@ const getMaturityCyclePeriod = (investment, cycleNumber) => {
   };
 };
 
-const resolveProfitPerShare = async (investment, scheduleMap) => {
+const resolveProfitPerShare = (investment, scheduleMap) => {
   if (investment.profitPerShareOverride != null && investment.profitPerShareOverride !== '') {
     return Number(investment.profitPerShareOverride) || 0;
   }
-  const schedule = scheduleMap
-    ? scheduleMap.get(investment.projectId)
-    : (await DB.profitSchedules.find({ projectId: investment.projectId, status: 'active' }))[0];
+  const schedule = scheduleMap ? scheduleMap.get(investment.projectId) : null;
   if (schedule) return Number(schedule.profitPerShare) || 0;
   const shares = Number(investment.sharesCount) || 0;
   if (shares > 0 && Number(investment.expectedReturn) > 0) {
@@ -217,11 +217,11 @@ const loadScheduleMap = async () => {
   return new Map(schedules.map((s) => [s.projectId, s]));
 };
 
-const enrichInvestmentRow = async (investment, maps) => {
+const enrichInvestmentRow = (investment, maps) => {
   const view = buildMaturityView(investment);
   if (!view) return null;
 
-  const profitPerShare = await resolveProfitPerShare(investment, maps.scheduleMap);
+  const profitPerShare = resolveProfitPerShare(investment, maps.scheduleMap);
   const shares = Number(investment.sharesCount) || 0;
   const profitAmount = calcProfitAmount(shares, profitPerShare);
   const principalAmount = view.includePrincipalOnPayoff && !investment.principalReturned
@@ -253,7 +253,242 @@ const enrichInvestmentRow = async (investment, maps) => {
 };
 
 /**
- * List matured (or filtered) maturity-enabled investments with pagination.
+ * Build all maturity/payoff report rows:
+ * 1) Explicit maturityEnabled investments
+ * 2) Existing Assign Profit schedules (Aug 3 weekly → matured Aug 10, etc.)
+ * Does NOT rewrite existing investments — schedule rows are derived live.
+ */
+const buildAllMaturityRows = async (asOf = new Date()) => {
+  const todayStr = getTodayDateStr(asOf);
+  const [schedules, users, projects, allPayoffs, allPayouts] = await Promise.all([
+    DB.profitSchedules.find({ status: 'active' }),
+    DB.users.listInvestors(),
+    DB.projects.find({}),
+    DB.maturityPayoffs.find({}),
+    DB.payouts.find({})
+  ]);
+
+  const scheduleMap = new Map(schedules.map((s) => [s.projectId, s]));
+  const userMap = new Map(users.map((u) => [u._id, u]));
+  const projectMap = new Map(projects.map((p) => [p._id, p]));
+  const maps = { userMap, projectMap, scheduleMap };
+
+  const projectIds = schedules.map((s) => s.projectId);
+  const investments = projectIds.length
+    ? await DB.investments.find({ projectIds, statusIn: ['active', 'completed'] })
+    : [];
+
+  // Also include maturity-enabled investments that may not be on a schedule
+  const maturityOnly = DB.investments.findMaturityEnabled
+    ? await DB.investments.findMaturityEnabled({})
+    : (await DB.investments.find({})).filter((i) => i.maturityEnabled && i.maturityType);
+  const byId = new Map();
+  for (const inv of investments) byId.set(inv._id, inv);
+  for (const inv of maturityOnly) {
+    if (!byId.has(inv._id)) byId.set(inv._id, inv);
+  }
+
+  const payoffsByInv = new Map();
+  for (const p of allPayoffs) {
+    if (!payoffsByInv.has(p.investmentId)) payoffsByInv.set(p.investmentId, []);
+    payoffsByInv.get(p.investmentId).push(p);
+  }
+
+  // Manual profit payouts (Profit Payouts page) that aren't maturity ledger rows
+  const payoutCoverByInv = new Map();
+  const payoutCoverByInvestorProject = new Map();
+  for (const p of allPayouts) {
+    if (p.payoutType === 'maturity_payoff') continue;
+    const amt = Number(p.amount) || 0;
+    if (!amt) continue;
+    if (p.investmentId) {
+      payoutCoverByInv.set(p.investmentId, (payoutCoverByInv.get(p.investmentId) || 0) + amt);
+    } else if (p.investorId && p.projectId) {
+      const key = `${p.investorId}:${p.projectId}`;
+      payoutCoverByInvestorProject.set(key, (payoutCoverByInvestorProject.get(key) || 0) + amt);
+    }
+  }
+  // Shared remaining cover for investor+project when payout has no investmentId
+  const remainingProjectCover = new Map(payoutCoverByInvestorProject);
+
+  const rows = [];
+
+  for (const investment of byId.values()) {
+    const shares = Number(investment.sharesCount) || 0;
+    if (shares <= 0) continue;
+    if (!['active', 'completed'].includes(investment.status || 'active')) continue;
+
+    const investor = userMap.get(investment.investorId);
+    const project = projectMap.get(investment.projectId);
+    const schedule = scheduleMap.get(investment.projectId);
+    const invPayoffs = payoffsByInv.get(investment._id) || [];
+    const paidCycleSet = new Set(invPayoffs.map((p) => Number(p.cycleNumber)));
+
+    // --- Path A: explicit per-investment maturity ---
+    if (investment.maturityEnabled && investment.maturityType) {
+      const view = buildMaturityView(investment, { asOf });
+      if (view && !view.isPaid) {
+        const profitPerShare = resolveProfitPerShare(investment, scheduleMap);
+        const profitAmount = calcProfitAmount(shares, profitPerShare);
+        const principalAmount = view.includePrincipalOnPayoff && !investment.principalReturned
+          ? Number(investment.amount) || 0
+          : 0;
+        rows.push({
+          source: 'investment_maturity',
+          investmentId: investment._id,
+          investorId: investment.investorId,
+          projectId: investment.projectId,
+          investorName: investor?.name || '—',
+          investorEmail: investor?.email || '',
+          investorPhone: investor?.phone || '',
+          projectTitle: project?.title || 'Project',
+          shares,
+          investmentAmount: Number(investment.amount) || 0,
+          profitPerShare,
+          profitAmount,
+          principalAmount,
+          totalPayoff: profitAmount + principalAmount,
+          maturityStartDate: investment.maturityStartDate,
+          customMaturityDate: investment.customMaturityDate || null,
+          ...view,
+          rowKey: `${investment._id}:m:${view.currentCycleNumber}`
+        });
+      } else if (view && view.isPaid) {
+        rows.push({
+          source: 'investment_maturity',
+          investmentId: investment._id,
+          investorId: investment.investorId,
+          projectId: investment.projectId,
+          investorName: investor?.name || '—',
+          investorEmail: investor?.email || '',
+          investorPhone: investor?.phone || '',
+          projectTitle: project?.title || 'Project',
+          shares,
+          investmentAmount: Number(investment.amount) || 0,
+          profitPerShare: resolveProfitPerShare(investment, scheduleMap),
+          profitAmount: 0,
+          principalAmount: 0,
+          totalPayoff: 0,
+          maturityStartDate: investment.maturityStartDate,
+          ...view,
+          rowKey: `${investment._id}:m:paid`
+        });
+      }
+      // Still also show schedule unpaid cycles if any (skip if same weekly schedule already covered by explicit maturity)
+      continue;
+    }
+
+    // --- Path B: existing Assign Profit schedule (most investors) ---
+    if (!schedule) continue;
+    const completed = getCompletedCycleCount(schedule, asOf);
+    const profitPerShare = Number(schedule.profitPerShare) || 0;
+    const perCycle = calcProfitAmount(shares, profitPerShare);
+
+    // Cover unpaid cycles with leftover manual payouts (FIFO)
+    let leftoverPayout = payoutCoverByInv.get(investment._id) || 0;
+    const projCoverKey = `${investment.investorId}:${investment.projectId}`;
+    if (!leftoverPayout && remainingProjectCover.has(projCoverKey)) {
+      leftoverPayout = remainingProjectCover.get(projCoverKey) || 0;
+    }
+
+    for (let cycle = 1; cycle <= completed; cycle += 1) {
+      if (paidCycleSet.has(cycle)) continue;
+      if (leftoverPayout >= perCycle - 0.009) {
+        leftoverPayout -= perCycle;
+        if (!payoutCoverByInv.has(investment._id)) {
+          remainingProjectCover.set(projCoverKey, leftoverPayout);
+        }
+        continue; // already paid via Profit Payouts page
+      }
+      if (!payoutCoverByInv.has(investment._id)) {
+        remainingProjectCover.set(projCoverKey, leftoverPayout);
+      }
+
+      const period = getCyclePeriod(schedule, cycle);
+      const daysMatured = Math.max(0, daysBetween(period.periodEnd, todayStr));
+      rows.push({
+        source: 'profit_schedule',
+        investmentId: investment._id,
+        investorId: investment.investorId,
+        projectId: investment.projectId,
+        investorName: investor?.name || '—',
+        investorEmail: investor?.email || '',
+        investorPhone: investor?.phone || '',
+        projectTitle: project?.title || 'Project',
+        shares,
+        investmentAmount: Number(investment.amount) || 0,
+        profitPerShare,
+        profitAmount: perCycle,
+        principalAmount: 0,
+        totalPayoff: perCycle,
+        maturityType: schedule.cycleType === 'monthly' ? 'monthly' : 'weekly',
+        maturityStatus: 'MATURED',
+        maturityStartDate: schedule.startDate,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        maturityDate: period.periodEnd,
+        nextMaturityDate: period.periodEnd,
+        currentCycleNumber: cycle,
+        currentCyclePeriod: `${period.periodStart} → ${period.periodEnd}`,
+        completedCycles: completed,
+        daysRemaining: 0,
+        daysMatured,
+        isMatured: true,
+        isPaid: false,
+        recurring: true,
+        includePrincipalOnPayoff: false,
+        earnedFormula: `${shares} × ৳${profitPerShare.toLocaleString('en-US')} = ৳${perCycle.toLocaleString('en-US')}`,
+        rowKey: `${investment._id}:s:${cycle}`
+      });
+    }
+
+    // Upcoming / active current cycle (not yet matured)
+    const nextCycle = completed + 1;
+    const nextPeriod = getCyclePeriod(schedule, nextCycle);
+    if (nextPeriod && todayStr <= nextPeriod.periodEnd) {
+      const daysRemaining = Math.max(0, daysBetween(todayStr, nextPeriod.periodEnd));
+      const upcomingStatus = daysRemaining <= 7 ? 'UPCOMING' : 'ACTIVE';
+      rows.push({
+        source: 'profit_schedule',
+        investmentId: investment._id,
+        investorId: investment.investorId,
+        projectId: investment.projectId,
+        investorName: investor?.name || '—',
+        investorEmail: investor?.email || '',
+        investorPhone: investor?.phone || '',
+        projectTitle: project?.title || 'Project',
+        shares,
+        investmentAmount: Number(investment.amount) || 0,
+        profitPerShare,
+        profitAmount: perCycle,
+        principalAmount: 0,
+        totalPayoff: perCycle,
+        maturityType: schedule.cycleType === 'monthly' ? 'monthly' : 'weekly',
+        maturityStatus: upcomingStatus,
+        maturityStartDate: schedule.startDate,
+        periodStart: nextPeriod.periodStart,
+        periodEnd: nextPeriod.periodEnd,
+        maturityDate: nextPeriod.periodEnd,
+        nextMaturityDate: nextPeriod.periodEnd,
+        currentCycleNumber: nextCycle,
+        currentCyclePeriod: `${nextPeriod.periodStart} → ${nextPeriod.periodEnd}`,
+        completedCycles: completed,
+        daysRemaining,
+        daysMatured: 0,
+        isMatured: false,
+        isPaid: false,
+        recurring: true,
+        includePrincipalOnPayoff: false,
+        rowKey: `${investment._id}:s:next:${nextCycle}`
+      });
+    }
+  }
+
+  return { rows, todayStr, maps };
+};
+
+/**
+ * List matured / filtered rows with pagination (schedule + explicit maturity).
  */
 const listMaturities = async (query = {}) => {
   const {
@@ -267,54 +502,28 @@ const listMaturities = async (query = {}) => {
     sortDir = 'asc'
   } = query;
 
-  const asOf = new Date();
-  const todayStr = getTodayDateStr(asOf);
-
-  // Only maturity-enabled investments — existing legacy rows are skipped
-  let investments = await DB.investments.findMaturityEnabled
-    ? await DB.investments.findMaturityEnabled({})
-    : (await DB.investments.find({})).filter((i) => i.maturityEnabled && i.maturityType);
+  const { rows: allRows, todayStr } = await buildAllMaturityRows();
+  let rows = allRows;
 
   if (maturityType && maturityType !== 'all') {
-    investments = investments.filter((i) => i.maturityType === maturityType);
+    rows = rows.filter((r) => r.maturityType === maturityType);
   }
   if (projectId) {
-    investments = investments.filter((i) => i.projectId === projectId);
+    rows = rows.filter((r) => r.projectId === projectId);
   }
 
-  // Soft-refresh derived status in memory (no mass DB write)
-  const views = investments
-    .map((inv) => ({ inv, view: buildMaturityView(inv, { asOf }) }))
-    .filter((x) => x.view);
-
-  let filtered = views;
   if (status && status !== 'all') {
     if (status === 'MATURED') {
-      filtered = views.filter((x) => x.view.isMatured && !x.view.isPaid);
+      rows = rows.filter((r) => r.isMatured && !r.isPaid);
     } else if (status === 'PAID') {
-      filtered = views.filter((x) => x.view.isPaid || x.view.maturityStatus === 'PAID');
+      rows = rows.filter((r) => r.isPaid || r.maturityStatus === 'PAID');
     } else if (status === 'UPCOMING') {
-      filtered = views.filter((x) => !x.view.isMatured && !x.view.isPaid && x.view.maturityStatus === 'UPCOMING');
+      rows = rows.filter((r) => !r.isMatured && !r.isPaid && r.maturityStatus === 'UPCOMING');
     } else if (status === 'ACTIVE') {
-      filtered = views.filter((x) => !x.view.isMatured && !x.view.isPaid);
+      rows = rows.filter((r) => !r.isMatured && !r.isPaid);
     } else {
-      filtered = views.filter((x) => x.view.maturityStatus === status);
+      rows = rows.filter((r) => r.maturityStatus === status);
     }
-  }
-
-  const [users, projects, scheduleMap] = await Promise.all([
-    DB.users.listInvestors(),
-    DB.projects.find({}),
-    loadScheduleMap()
-  ]);
-  const userMap = new Map(users.map((u) => [u._id, u]));
-  const projectMap = new Map(projects.map((p) => [p._id, p]));
-  const maps = { userMap, projectMap, scheduleMap };
-
-  let rows = [];
-  for (const { inv } of filtered) {
-    const row = await enrichInvestmentRow(inv, maps);
-    if (row) rows.push(row);
   }
 
   const q = String(search || '').trim().toLowerCase();
@@ -358,15 +567,10 @@ const listMaturities = async (query = {}) => {
 };
 
 /**
- * Aggregate counts from maturity-enabled investments only.
+ * Aggregate counts from schedule-backed + maturity-enabled rows.
  */
 const getMaturityCounts = async () => {
-  const asOf = new Date();
-  const todayStr = getTodayDateStr(asOf);
-  const investments = DB.investments.findMaturityEnabled
-    ? await DB.investments.findMaturityEnabled({})
-    : (await DB.investments.find({})).filter((i) => i.maturityEnabled && i.maturityType);
-
+  const { rows, todayStr } = await buildAllMaturityRows();
   const counts = {
     weeklyMatured: 0,
     monthlyMatured: 0,
@@ -376,16 +580,14 @@ const getMaturityCounts = async () => {
     active: 0
   };
 
-  for (const inv of investments) {
-    const view = buildMaturityView(inv, { asOf });
-    if (!view) continue;
-    if (view.isMatured && !view.isPaid) {
-      if (view.maturityType === 'weekly') counts.weeklyMatured += 1;
-      else if (view.maturityType === 'monthly') counts.monthlyMatured += 1;
-      else if (view.maturityType === 'custom') counts.customMatured += 1;
-    } else if (!view.isPaid && view.maturityStatus === 'UPCOMING') {
+  for (const r of rows) {
+    if (r.isMatured && !r.isPaid) {
+      if (r.maturityType === 'weekly') counts.weeklyMatured += 1;
+      else if (r.maturityType === 'monthly') counts.monthlyMatured += 1;
+      else if (r.maturityType === 'custom') counts.customMatured += 1;
+    } else if (!r.isPaid && r.maturityStatus === 'UPCOMING') {
       counts.upcoming += 1;
-    } else if (!view.isPaid) {
+    } else if (!r.isPaid && !r.isMatured) {
       counts.active += 1;
     }
   }
@@ -401,7 +603,7 @@ const getMaturityCounts = async () => {
 };
 
 /**
- * Atomic payoff for one matured cycle.
+ * Atomic payoff for one matured cycle (explicit maturity OR Assign Profit schedule).
  */
 const payOffMaturity = async ({
   investmentId,
@@ -410,47 +612,52 @@ const payOffMaturity = async ({
   referenceNo = '',
   screenshotUrl = '',
   notes = '',
-  includePrincipal
+  includePrincipal,
+  cycleNumber: requestedCycle
 }) => {
   if (!investmentId) throw new Error('investmentId is required');
   if (!adminId) throw new Error('adminId is required');
 
   const investment = await DB.investments.findById(investmentId);
   if (!investment) throw new Error('Investment not found');
-  if (!investment.maturityEnabled || !investment.maturityType) {
-    throw new Error('This investment does not use the maturity system');
+
+  const { rows } = await buildAllMaturityRows();
+  const maturedRows = rows.filter((r) =>
+    r.investmentId === investmentId && r.isMatured && !r.isPaid
+  );
+
+  let target = null;
+  if (requestedCycle != null && requestedCycle !== '') {
+    target = maturedRows.find((r) => Number(r.currentCycleNumber) === Number(requestedCycle));
+  } else {
+    // Earliest unpaid matured cycle
+    target = maturedRows.sort((a, b) => a.currentCycleNumber - b.currentCycleNumber)[0];
   }
 
-  const view = buildMaturityView(investment);
-  if (!view) throw new Error('Unable to compute maturity for this investment');
-  if (view.isPaid) throw new Error('This maturity cycle has already been paid.');
-  if (!view.isMatured) {
-    throw new Error(`Investment is not matured yet (matures on ${view.maturityDate})`);
+  if (!target) {
+    throw new Error('No unpaid matured cycle found for this investment.');
   }
 
-  const cycleNumber = view.currentCycleNumber;
+  const cycleNumber = target.currentCycleNumber;
   const existing = await DB.maturityPayoffs.findOne({ investmentId, cycleNumber });
   if (existing) {
     throw new Error('This maturity cycle has already been paid.');
   }
 
-  const scheduleMap = await loadScheduleMap();
-  const profitPerShare = await resolveProfitPerShare(investment, scheduleMap);
-  const shares = Number(investment.sharesCount) || 0;
-  const profitAmount = calcProfitAmount(shares, profitPerShare);
+  const profitPerShare = Number(target.profitPerShare) || 0;
+  const shares = Number(target.shares) || Number(investment.sharesCount) || 0;
+  const profitAmount = Number(target.profitAmount) || calcProfitAmount(shares, profitPerShare);
 
   const wantPrincipal = includePrincipal != null
     ? Boolean(includePrincipal)
-    : Boolean(view.includePrincipalOnPayoff);
+    : Boolean(target.includePrincipalOnPayoff);
   const principalAmount = wantPrincipal && !investment.principalReturned
     ? Number(investment.amount) || 0
     : 0;
   const totalPayoff = profitAmount + principalAmount;
   const now = new Date().toISOString();
 
-  const nextPaid = (Number(investment.maturityCyclesPaid) || 0) + 1;
-  let investmentUpdate = {
-    maturityCyclesPaid: nextPaid,
+  const investmentUpdate = {
     lastMaturedAt: now,
     profitNotAssigned: false
   };
@@ -463,25 +670,35 @@ const payOffMaturity = async ({
     investmentUpdate.principalReturned = true;
   }
 
-  if (view.recurring) {
-    const nextCycle = nextPaid + 1;
-    const nextPeriod = getMaturityCyclePeriod(investment, nextCycle);
-    investmentUpdate.currentMaturityCycle = nextCycle;
-    investmentUpdate.nextMaturityDate = nextPeriod?.maturityDate || null;
-    investmentUpdate.maturityDate = nextPeriod?.maturityDate || investment.maturityDate;
-    investmentUpdate.maturityStatus = 'ACTIVE';
-  } else {
-    investmentUpdate.currentMaturityCycle = cycleNumber;
-    investmentUpdate.nextMaturityDate = null;
-    investmentUpdate.maturityStatus = 'PAID';
-    investmentUpdate.status = 'completed';
+  if (investment.maturityEnabled) {
+    const nextPaid = Math.max(Number(investment.maturityCyclesPaid) || 0, cycleNumber);
+    investmentUpdate.maturityCyclesPaid = nextPaid;
+    if (target.recurring) {
+      const nextCycle = nextPaid + 1;
+      const nextPeriod = getMaturityCyclePeriod(investment, nextCycle);
+      investmentUpdate.currentMaturityCycle = nextCycle;
+      investmentUpdate.nextMaturityDate = nextPeriod?.maturityDate || null;
+      investmentUpdate.maturityDate = nextPeriod?.maturityDate || investment.maturityDate;
+      investmentUpdate.maturityStatus = 'ACTIVE';
+    } else {
+      investmentUpdate.currentMaturityCycle = cycleNumber;
+      investmentUpdate.nextMaturityDate = null;
+      investmentUpdate.maturityStatus = 'PAID';
+      investmentUpdate.status = 'completed';
+    }
   }
 
+  // Tag schedule-backed payoffs with maturityType for history filters
+  const investmentForLedger = {
+    ...investment,
+    maturityType: target.maturityType || investment.maturityType || 'weekly'
+  };
+
   const result = await DB.maturityPayoffs.createPayoffTransaction({
-    investment,
+    investment: investmentForLedger,
     cycleNumber,
-    periodStart: view.periodStart,
-    maturityDate: view.maturityDate,
+    periodStart: target.periodStart,
+    maturityDate: target.maturityDate,
     shares,
     profitPerShare,
     principalAmount,
@@ -500,28 +717,24 @@ const payOffMaturity = async ({
 };
 
 const getInvestorMaturitySummary = async (investorId) => {
-  const investments = (await DB.investments.find({ investorId }))
-    .filter((i) => i.maturityEnabled && i.maturityType);
-  if (!investments.length) return [];
+  const { rows } = await buildAllMaturityRows();
+  const mine = rows.filter((r) => r.investorId === investorId);
+  const payoffs = await DB.maturityPayoffs.find({ investorId });
 
-  const [projects, scheduleMap, payoffs] = await Promise.all([
-    DB.projects.find({}),
-    loadScheduleMap(),
-    DB.maturityPayoffs.find({ investorId })
-  ]);
-  const projectMap = new Map(projects.map((p) => [p._id, p]));
-  const maps = { userMap: new Map(), projectMap, scheduleMap };
-
-  const rows = [];
-  for (const inv of investments) {
-    const row = await enrichInvestmentRow(inv, maps);
-    if (!row) continue;
-    row.payoffHistory = payoffs
-      .filter((p) => p.investmentId === inv._id)
-      .sort((a, b) => (b.cycleNumber || 0) - (a.cycleNumber || 0));
-    rows.push(row);
+  // Prefer one summary row per investment (latest / matured first)
+  const byInv = new Map();
+  for (const r of mine) {
+    const prev = byInv.get(r.investmentId);
+    if (!prev || (r.isMatured && !prev.isMatured) || (r.currentCycleNumber > (prev.currentCycleNumber || 0))) {
+      byInv.set(r.investmentId, {
+        ...r,
+        payoffHistory: payoffs
+          .filter((p) => p.investmentId === r.investmentId)
+          .sort((a, b) => (b.cycleNumber || 0) - (a.cycleNumber || 0))
+      });
+    }
   }
-  return rows;
+  return [...byInv.values()];
 };
 
 module.exports = {
@@ -533,6 +746,7 @@ module.exports = {
   initMaturityFields,
   resolveProfitPerShare,
   calcProfitAmount,
+  buildAllMaturityRows,
   listMaturities,
   getMaturityCounts,
   payOffMaturity,

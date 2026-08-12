@@ -9,10 +9,12 @@ require('dotenv').config({ path: path.join(__dirname, '../../.env') });
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 const DB = require('../db');
+const bcrypt = require('bcrypt');
 const { initMaturityFields, getMaturityCyclePeriod } = require('../services/maturityService');
 const { getTodayDateStr, parseDateOnly, dateToIsoDate, addCalendarMonths } = require('../services/profitScheduleService');
 
 const DEMO_TAG = 'maturity-demo';
+let sharedPasswordHash = null;
 
 const addDays = (dateStr, days) => {
   const d = parseDateOnly(dateStr);
@@ -23,10 +25,14 @@ const addDays = (dateStr, days) => {
 async function ensureInvestor(email, name) {
   let user = await DB.users.findOne({ email });
   if (user) return user;
+  if (!sharedPasswordHash) {
+    // Hash once for all demo users — bcrypt per user is the usual seed bottleneck.
+    sharedPasswordHash = await bcrypt.hash('password123', Number(process.env.BCRYPT_ROUNDS) || 8);
+  }
   user = await DB.users.create({
     name,
     email,
-    password: 'password123',
+    passwordHash: sharedPasswordHash,
     role: 'investor',
     phone: '01700000000'
   });

@@ -29,7 +29,10 @@ const readCollection = (collection) => {
 
 const writeCollection = (collection, data) => {
   const file = getFilePath(collection);
-  fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+  // Compact JSON is much faster for large collections / seed loops.
+  // Set PRETTY_JSON=1 only when you need human-readable files.
+  const pretty = process.env.PRETTY_JSON === '1' || process.env.PRETTY_JSON === 'true';
+  fs.writeFileSync(file, pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data), 'utf8');
 };
 
 // Serialize confirmScheduledCycle per schedule+cycle so concurrent callers cannot
@@ -114,7 +117,8 @@ const initDb = async () => {
     });
     updated = true;
     console.log('Seeded Admin user (admin@startupboxbd.com / password123)');
-  } else {
+  } else if (process.env.SYNC_ADMIN_PASSWORD === 'true') {
+    // Opt-in only — bcrypt on every boot is a common cause of slow seed/startup.
     const adminPassword = process.env.ADMIN_PASSWORD || 'password123';
     const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
     if (!passwordOk) {
@@ -201,7 +205,8 @@ const DB = {
     },
     create: async (userData) => {
       const users = readCollection('users');
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
+      const hashedPassword = userData.passwordHash
+        || await bcrypt.hash(userData.password, Number(process.env.BCRYPT_ROUNDS) || 10);
       const newUser = {
         _id: generateId(),
         name: userData.name,
@@ -275,16 +280,27 @@ const DB = {
     listInvestorsWithStats: async () => {
       const investors = readCollection('users').filter(u => u.role === 'investor');
       const investments = readCollection('investments');
+      const byInvestor = new Map();
+      for (const i of investments) {
+        if (!byInvestor.has(i.investorId)) byInvestor.set(i.investorId, []);
+        byInvestor.get(i.investorId).push(i);
+      }
 
       return investors.map((inv) => {
-        const invInvestments = investments.filter(i => i.investorId === inv._id);
+        const invInvestments = byInvestor.get(inv._id) || [];
         const projectIds = new Set(invInvestments.map(i => i.projectId).filter(Boolean));
-        const totalShares = invInvestments
-          .filter(i => ['active', 'completed'].includes(i.status))
-          .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
-        const totalInvested = invInvestments
-          .filter(i => ['active', 'completed', 'pending'].includes(i.status))
-          .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+        let totalShares = 0;
+        let totalInvested = 0;
+        let activeInvestments = 0;
+        for (const i of invInvestments) {
+          if (['active', 'completed'].includes(i.status)) {
+            totalShares += Number(i.sharesCount) || 0;
+          }
+          if (['active', 'completed', 'pending'].includes(i.status)) {
+            totalInvested += Number(i.amount) || 0;
+          }
+          if (i.status === 'active') activeInvestments += 1;
+        }
 
         return {
           ...stripPassword(inv),
@@ -293,7 +309,7 @@ const DB = {
             investmentCount: invInvestments.length,
             totalShares,
             totalInvested,
-            activeInvestments: invInvestments.filter(i => i.status === 'active').length
+            activeInvestments
           }
         };
       });
@@ -456,7 +472,15 @@ const DB = {
       let data = readCollection('investments');
       if (query.investorId) data = data.filter(i => i.investorId === query.investorId);
       if (query.projectId) data = data.filter(i => i.projectId === query.projectId);
+      if (query.projectIds && query.projectIds.length) {
+        const set = new Set(query.projectIds);
+        data = data.filter(i => set.has(i.projectId));
+      }
       if (query.status) data = data.filter(i => i.status === query.status);
+      if (query.statusIn && query.statusIn.length) {
+        const set = new Set(query.statusIn);
+        data = data.filter(i => set.has(i.status));
+      }
       return data.sort((a, b) => new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));
     },
     findById: async (id) => {

@@ -93,7 +93,10 @@ const initDb = async () => {
       createdAt: new Date().toISOString()
     });
     console.log(`Seeded Admin user (${adminEmail})`);
-  } else {
+  } else if (process.env.SYNC_ADMIN_PASSWORD === 'true') {
+    // Intentionally opt-in: bcrypt.compare on every boot adds ~100–300ms+ and
+    // hurts shared hosting / Passenger restarts. Use SYNC_ADMIN_PASSWORD=true
+    // only when you need to force-reset the admin password from env.
     const passwordOk = await bcrypt.compare(adminPassword, adminExists.password);
     if (!passwordOk) {
       await User.updateOne(
@@ -159,7 +162,9 @@ const DB = {
       const doc = await User.create({
         name: userData.name,
         email: userData.email,
-        password: await bcrypt.hash(userData.password, 10),
+        // Seed scripts can pass passwordHash to avoid repeated slow bcrypt work.
+        password: userData.passwordHash
+          || await bcrypt.hash(userData.password, Number(process.env.BCRYPT_ROUNDS) || 10),
         role: userData.role || 'investor',
         phone: userData.phone || '',
         address: userData.address || '',
@@ -228,16 +233,27 @@ const DB = {
     listInvestorsWithStats: async () => {
       const investors = await User.find({ role: 'investor' }).lean();
       const investments = await Investment.find({}).lean();
+      const byInvestor = new Map();
+      for (const i of investments) {
+        if (!byInvestor.has(i.investorId)) byInvestor.set(i.investorId, []);
+        byInvestor.get(i.investorId).push(i);
+      }
 
       return investors.map((inv) => {
-        const invInvestments = investments.filter(i => i.investorId === inv._id);
+        const invInvestments = byInvestor.get(inv._id) || [];
         const projectIds = new Set(invInvestments.map(i => i.projectId).filter(Boolean));
-        const totalShares = invInvestments
-          .filter(i => ['active', 'completed'].includes(i.status))
-          .reduce((s, i) => s + (Number(i.sharesCount) || 0), 0);
-        const totalInvested = invInvestments
-          .filter(i => ['active', 'completed', 'pending'].includes(i.status))
-          .reduce((s, i) => s + (Number(i.amount) || 0), 0);
+        let totalShares = 0;
+        let totalInvested = 0;
+        let activeInvestments = 0;
+        for (const i of invInvestments) {
+          if (['active', 'completed'].includes(i.status)) {
+            totalShares += Number(i.sharesCount) || 0;
+          }
+          if (['active', 'completed', 'pending'].includes(i.status)) {
+            totalInvested += Number(i.amount) || 0;
+          }
+          if (i.status === 'active') activeInvestments += 1;
+        }
 
         return {
           ...stripPassword(inv),
@@ -246,7 +262,7 @@ const DB = {
             investmentCount: invInvestments.length,
             totalShares,
             totalInvested,
-            activeInvestments: invInvestments.filter(i => i.status === 'active').length
+            activeInvestments
           }
         };
       });
@@ -376,7 +392,9 @@ const DB = {
       const q = {};
       if (query.investorId) q.investorId = query.investorId;
       if (query.projectId) q.projectId = query.projectId;
+      if (query.projectIds && query.projectIds.length) q.projectId = { $in: query.projectIds };
       if (query.status) q.status = query.status;
+      if (query.statusIn && query.statusIn.length) q.status = { $in: query.statusIn };
       const data = await Investment.find(q).lean();
       return data.sort((a, b) =>
         new Date(b.createdAt || b.startDate) - new Date(a.createdAt || a.startDate));

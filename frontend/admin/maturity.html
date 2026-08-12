@@ -63,7 +63,7 @@
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
             <h2>Maturity / Payouts</h2>
-            <p>Report of matured investors. Pay them manually by bank transfer / bKash, then mark as paid with proof. No online payment gateway.</p>
+            <p>Shows matured profit from Assign Profit schedules (e.g. Aug 3 → Aug 10) and new maturity investments. Pay manually by bank/bKash, then mark as paid.</p>
           </div>
         </div>
       </div>
@@ -186,6 +186,7 @@
       <div id="pay-error" class="error-msg" style="display:none;"></div>
       <form id="pay-form">
         <input type="hidden" id="pay-investment-id">
+        <input type="hidden" id="pay-cycle-number">
         <div class="form-group">
           <label>Payment Method</label>
           <select id="pay-method" class="form-control">
@@ -277,13 +278,13 @@
               <td>${formatMoney(r.profitPerShare)}</td>
               <td class="text-success"><strong>${formatMoney(r.profitAmount)}</strong></td>
               <td>${escapeHtml(r.maturityStartDate || '—')}</td>
-              <td><strong>${escapeHtml(r.maturityDate || '—')}</strong></td>
+              <td><strong>${escapeHtml(r.maturityDate || '—')}</strong>${r.currentCycleNumber ? `<br><small class="text-muted">Cycle #${r.currentCycleNumber}</small>` : ''}</td>
               <td>${r.isMatured ? (r.daysMatured || 0) + 'd overdue' : (r.daysRemaining || 0) + 'd left'}</td>
               <td><span class="status-pill ${escapeHtml(r.maturityStatus)}">${escapeHtml(r.maturityStatus)}</span></td>
               <td>
                 <div class="action-btns">
                   <a class="btn btn-outline btn-sm" href="/admin/investor-detail.html?id=${encodeURIComponent(r.investorId)}">View</a>
-                  ${r.isMatured && !r.isPaid ? `<button type="button" class="btn btn-sm payoff-btn" data-id="${escapeHtml(r.investmentId)}">Mark Paid</button>` : ''}
+                  ${r.isMatured && !r.isPaid ? `<button type="button" class="btn btn-sm payoff-btn" data-id="${escapeHtml(r.investmentId)}" data-cycle="${r.currentCycleNumber || ''}">Mark Paid</button>` : ''}
                 </div>
               </td>
             </tr>`).join('');
@@ -326,6 +327,7 @@
     const openPayoff = (row) => {
       state.selected = row;
       document.getElementById('pay-investment-id').value = row.investmentId;
+      document.getElementById('pay-cycle-number').value = row.currentCycleNumber || '';
       document.getElementById('pay-error').style.display = 'none';
       document.getElementById('pay-reference').value = '';
       document.getElementById('pay-note').value = `Maturity cycle ${row.currentCycleNumber} · ${row.maturityDate}`;
@@ -388,7 +390,10 @@
       document.getElementById('maturity-table').addEventListener('click', (e) => {
         const btn = e.target.closest('.payoff-btn');
         if (!btn) return;
-        const row = (state._items || []).find(r => r.investmentId === btn.dataset.id);
+        const row = (state._items || []).find(r =>
+          r.investmentId === btn.dataset.id &&
+          String(r.currentCycleNumber || '') === String(btn.dataset.cycle || r.currentCycleNumber || '')
+        ) || (state._items || []).find(r => r.investmentId === btn.dataset.id);
         if (row) openPayoff(row);
       });
 
@@ -419,6 +424,7 @@
             method: 'POST',
             body: JSON.stringify({
               investmentId: document.getElementById('pay-investment-id').value,
+              cycleNumber: document.getElementById('pay-cycle-number').value || undefined,
               paymentMethod: document.getElementById('pay-method').value,
               referenceNo,
               screenshotUrl,

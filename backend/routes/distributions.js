@@ -259,26 +259,25 @@ router.get('/audit-log', protect, adminOnly, async (req, res) => {
   try {
     const logs = await DB.auditLog.find({ action: 'profit_distribution' });
 
-    // Populate admin name and project title for each log entry
-    const populated = await Promise.all(logs.map(async (log) => {
-      let adminName = 'Admin';
-      let projectTitle = 'Unknown Project';
-      try {
-        if (log.performedBy) {
-          const admin = await DB.users.findById(log.performedBy);
-          if (admin) adminName = admin.name || admin.email || 'Admin';
-        }
-        if (log.metadata?.projectId) {
-          const project = await DB.projects.findById(log.metadata.projectId);
-          if (project) projectTitle = project.title;
-        }
-      } catch (_) { /* ignore lookup errors */ }
+    // Batch-fetch all referenced admins and projects (avoids N+1 queries)
+    const adminIds = [...new Set(logs.map(l => l.performedBy).filter(Boolean))];
+    const projectIds = [...new Set(logs.map(l => l.metadata?.projectId).filter(Boolean))];
+    const [admins, projects] = await Promise.all([
+      adminIds.length ? DB.users.find({}) : Promise.resolve([]),
+      projectIds.length ? DB.projects.find({}) : Promise.resolve([])
+    ]);
+    const adminMap = new Map(admins.map(a => [a._id, a]));
+    const projectMap = new Map(projects.map(p => [p._id, p]));
+
+    const populated = logs.map(log => {
+      const admin = log.performedBy ? adminMap.get(log.performedBy) : null;
+      const project = log.metadata?.projectId ? projectMap.get(log.metadata.projectId) : null;
       return {
         ...log,
-        adminName,
-        projectTitle
+        adminName: admin ? (admin.name || admin.email || 'Admin') : 'Admin',
+        projectTitle: project ? project.title : 'Unknown Project'
       };
-    }));
+    });
 
     res.json(populated);
   } catch (err) {

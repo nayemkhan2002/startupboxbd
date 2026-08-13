@@ -31,6 +31,8 @@ app.use('/api/profit-images', require('./routes/profitImages'));
 app.use('/api/distributions', require('./routes/distributions'));
 app.use('/api/maturity', require('./routes/maturity'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/admin', require('./routes/audit'));
+app.use('/api/admin', require('./routes/investor360'));
 
 // Fallback for root
 app.get('/', (req, res) => {

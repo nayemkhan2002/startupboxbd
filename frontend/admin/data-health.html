@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Health Audit — Startup Box BD Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <link rel="stylesheet" href="/assets/css/admin.css">
+  <style>
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .status-ok { background: #D1FAE5; color: #065F46; }
+    .status-warning { background: #FEF3C7; color: #92400E; }
+    .status-critical { background: #FEE2E2; color: #991B1B; }
+
+    .health-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .health-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+    }
+    .health-card .hc-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    .health-card .hc-val {
+      font-size: 1.6rem;
+      font-weight: 800;
+      margin-top: 4px;
+    }
+
+    .issue-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 0.82rem;
+      color: #DC2626;
+    }
+    .issue-list li { margin-bottom: 2px; }
+
+    .tab-btn {
+      padding: 8px 16px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-wrapper">
+    <aside class="admin-sidebar" id="admin-sidebar">
+      <div>
+        <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
+          <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
+          <span class="brand-logo-stack">
+            <span class="brand-logo-text"><span class="brand-logo-light">Startup</span><span class="brand-logo-accent">Boxbd</span></span>
+            <span class="brand-text">ADMIN</span>
+          </span>
+        </a>
+        <nav class="admin-nav">
+          <a href="/admin/dashboard.html"><span class="nav-icon">▣</span> Dashboard</a>
+          <a href="/admin/projects.html"><span class="nav-icon">◎</span> Projects</a>
+          <a href="/admin/assign-profit.html"><span class="nav-icon">📊</span> Assign Profit</a>
+          <a href="/admin/distribution-history.html"><span class="nav-icon">📋</span> Distribution History</a>
+          <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
+          <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
+          <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
+          <a href="/admin/investor-list.html"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/data-health.html" class="active"><span class="nav-icon">🏥</span> Data Health Audit</a>
+          <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
+          <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
+        </nav>
+      </div>
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-info">
+          <div class="admin-user-avatar" id="admin-avatar">A</div>
+          <div>
+            <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn" style="margin-top:12px;">Logout</button>
+      </div>
+    </aside>
+
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <div class="flex gap-2" style="align-items:center;">
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
+          <div>
+            <h1 style="font-size:1.35rem;margin:0;">Investor Data Health &amp; Audit</h1>
+            <p class="text-muted" style="margin:2px 0 0 0;font-size:0.85rem;">Real-time integrity verification across all investor profiles and financial ledgers</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline" id="refresh-btn">🔄 Re-Run Audit</button>
+        </div>
+      </header>
+
+      <main class="admin-content">
+        <div class="health-summary-grid">
+          <div class="health-card">
+            <div class="hc-title">Total Investors</div>
+            <div class="hc-val" id="sum-total">—</div>
+          </div>
+          <div class="health-card">
+            <div class="hc-title">Healthy (OK)</div>
+            <div class="hc-val text-success" id="sum-ok">—</div>
+          </div>
+          <div class="health-card">
+            <div class="hc-title">Warnings</div>
+            <div class="hc-val text-warn" id="sum-warn" style="color:#D97706;">—</div>
+          </div>
+          <div class="health-card">
+            <div class="hc-title">Critical Errors</div>
+            <div class="hc-val text-danger" id="sum-crit" style="color:#DC2626;">—</div>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex gap-2 mb-3" style="border-bottom:1px solid var(--border);">
+          <button class="tab-btn active" id="tab-investors-btn">Investor Consistency Report</button>
+          <button class="tab-btn" id="tab-integrity-btn">Database Integrity Check</button>
+        </div>
+
+        <!-- Tab 1: Investors -->
+        <div id="tab-investors" class="panel">
+          <div class="panel-header flex-between">
+            <h2>Investor Profile Data Consistency</h2>
+            <input type="text" id="search-input" placeholder="Search investor name or email..." class="form-input" style="max-width:260px;font-size:0.85rem;">
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Investor</th>
+                  <th>Total Invested</th>
+                  <th>Total Shares</th>
+                  <th>Total Profit</th>
+                  <th>Wallet Balance</th>
+                  <th>Issues / Mismatches</th>
+                </tr>
+              </thead>
+              <tbody id="investors-tbody">
+                <tr><td colspan="7"><div class="empty-state" style="padding:20px;"><p>Running audit...</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 2: Integrity -->
+        <div id="tab-integrity" class="panel" style="display:none;">
+          <div class="panel-header">
+            <h2>System Database Integrity Anomalies</h2>
+          </div>
+          <div id="integrity-content" style="padding:16px;">
+            <p>Loading integrity status...</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/js/api.js"></script>
+  <script>
+    let auditData = null;
+    let integrityData = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      const user = checkAuth('admin');
+      if (!user) return;
+
+      document.getElementById('admin-name').textContent = user.name || 'Admin';
+      document.getElementById('admin-email').textContent = user.email || '';
+      document.getElementById('logout-btn').addEventListener('click', logout);
+      initSidebarToggle('.admin-sidebar');
+
+      // Tabs
+      const tabInvBtn = document.getElementById('tab-investors-btn');
+      const tabIntBtn = document.getElementById('tab-integrity-btn');
+      const tabInv = document.getElementById('tab-investors');
+      const tabInt = document.getElementById('tab-integrity');
+
+      tabInvBtn.addEventListener('click', () => {
+        tabInvBtn.classList.add('active');
+        tabIntBtn.classList.remove('active');
+        tabInv.style.display = 'block';
+        tabInt.style.display = 'none';
+      });
+
+      tabIntBtn.addEventListener('click', () => {
+        tabIntBtn.classList.add('active');
+        tabInvBtn.classList.remove('active');
+        tabInt.style.display = 'block';
+        tabInv.style.display = 'none';
+      });
+
+      document.getElementById('refresh-btn').addEventListener('click', runAudit);
+      document.getElementById('search-input').addEventListener('input', renderInvestors);
+
+      await runAudit();
+    });
+
+    async function runAudit() {
+      const tbody = document.getElementById('investors-tbody');
+      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:20px;"><p>Executing full audit...</p></div></td></tr>`;
+      
+      try {
+        const [auditRes, intRes] = await Promise.all([
+          apiFetch('/admin/audit/investors'),
+          apiFetch('/admin/audit/integrity')
+        ]);
+
+        auditData = auditRes;
+        integrityData = intRes;
+
+        // Render summary
+        document.getElementById('sum-total').textContent = auditRes.summary.totalInvestors;
+        document.getElementById('sum-ok').textContent = auditRes.summary.healthy;
+        document.getElementById('sum-warn').textContent = auditRes.summary.warnings;
+        document.getElementById('sum-crit').textContent = auditRes.summary.critical;
+
+        renderInvestors();
+        renderIntegrity();
+      } catch (err) {
+        showToast(err.message, 'error');
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:20px;"><p class="text-danger">Audit failed: ${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    }
+
+    function renderInvestors() {
+      if (!auditData) return;
+      const search = (document.getElementById('search-input').value || '').toLowerCase();
+      const tbody = document.getElementById('investors-tbody');
+
+      const filtered = auditData.investors.filter(i => 
+        i.name.toLowerCase().includes(search) || i.email.toLowerCase().includes(search)
+      );
+
+      if (!filtered.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state" style="padding:16px;"><p>No matching investors found.</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(inv => {
+        const statusClass = inv.status === 'OK' ? 'status-ok' : (inv.status === 'WARNING' ? 'status-warning' : 'status-critical');
+        const issueHtml = inv.issues && inv.issues.length 
+          ? `<ul class="issue-list">${inv.issues.map(is => `<li>${escapeHtml(is)}</li>`).join('')}</ul>`
+          : '<span class="text-muted">None</span>';
+
+        return `
+          <tr>
+            <td><span class="status-pill ${statusClass}">${inv.status}</span></td>
+            <td>
+              <strong>${escapeHtml(inv.name)}</strong><br>
+              <small class="text-muted">${escapeHtml(inv.email)}</small>
+            </td>
+            <td>${formatMoney(inv.db.totalInvested)}</td>
+            <td>${inv.db.totalShares}</td>
+            <td class="text-success"><strong>${formatMoney(inv.db.totalProfit)}</strong></td>
+            <td>${formatMoney(inv.db.walletBalance)}</td>
+            <td>${issueHtml}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderIntegrity() {
+      if (!integrityData) return;
+      const el = document.getElementById('integrity-content');
+
+      const { summary, counts, anomalies } = integrityData;
+
+      let html = `
+        <div class="mb-3" style="display:flex;gap:20px;flex-wrap:wrap;background:var(--bg-elevated);padding:14px;border-radius:var(--radius);border:1px solid var(--border);">
+          <div><strong>Total Users:</strong> ${counts.users}</div>
+          <div><strong>Investors:</strong> ${counts.investors}</div>
+          <div><strong>Projects:</strong> ${counts.projects}</div>
+          <div><strong>Investments:</strong> ${counts.investments}</div>
+          <div><strong>Ledger Entries:</strong> ${counts.ledgerEntries}</div>
+          <div><strong>Wallets:</strong> ${counts.wallets}</div>
+        </div>
+      `;
+
+      if (!anomalies.length) {
+        html += `<div class="empty-state" style="padding:24px;"><p class="text-success"><strong>✅ System Integrity 100% Clean</strong>. No orphaned records or corrupt data found.</p></div>`;
+      } else {
+        html += `<h3 style="margin-bottom:12px;">Detected Integrity Issues (${anomalies.length})</h3>`;
+        html += anomalies.map(a => `
+          <div class="panel mb-2" style="border-left:4px solid ${a.severity === 'CRITICAL' ? '#DC2626' : '#D97706'};padding:14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <strong style="color:${a.severity === 'CRITICAL' ? '#DC2626' : '#D97706'};">${escapeHtml(a.type)}</strong>
+              <span class="status-pill ${a.severity === 'CRITICAL' ? 'status-critical' : 'status-warning'}">${a.severity}</span>
+            </div>
+            <p style="margin:4px 0 8px 0;font-size:0.88rem;">Count: ${a.count}</p>
+            <pre style="background:var(--bg-base);padding:8px;border-radius:4px;font-size:0.78rem;overflow-x:auto;">${escapeHtml(JSON.stringify(a.details, null, 2))}</pre>
+          </div>
+        `).join('');
+      }
+
+      el.innerHTML = html;
+    }
+  </script>
+</body>
+</html>

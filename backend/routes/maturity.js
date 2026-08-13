@@ -11,13 +11,65 @@ const {
   buildMaturityView
 } = require('../services/maturityService');
 
-// Admin: maturity notification counts
-router.get('/counts', protect, adminOnly, async (req, res) => {
+// Admin: diagnose why maturity list may be empty (schedules, investments, today)
+router.get('/diagnose', protect, adminOnly, async (req, res) => {
   try {
-    const counts = await getMaturityCounts();
-    res.json(counts);
+    const {
+      getTodayDateStr,
+      getCompletedCycleCount,
+      getCyclePeriod
+    } = require('../services/profitScheduleService');
+    const { buildAllMaturityRows } = require('../services/maturityService');
+
+    const todayStr = getTodayDateStr();
+    const schedules = await DB.profitSchedules.find({ status: 'active' });
+    const projectIds = schedules.map((s) => s.projectId);
+    const investments = projectIds.length
+      ? await DB.investments.find({ projectIds, statusIn: ['active', 'completed'] })
+      : [];
+    const maturityEnabled = (await DB.investments.find({})).filter((i) => i.maturityEnabled).length;
+    const { rows } = await buildAllMaturityRows();
+    const matured = rows.filter((r) => r.isMatured && !r.isPaid);
+
+    res.json({
+      today: todayStr,
+      timezone: 'Asia/Dhaka',
+      activeSchedules: schedules.map((s) => {
+        const completed = getCompletedCycleCount(s);
+        const last = completed > 0 ? getCyclePeriod(s, completed) : null;
+        return {
+          scheduleId: s._id,
+          projectId: s.projectId,
+          cycleType: s.cycleType,
+          startDate: s.startDate,
+          profitPerShare: s.profitPerShare,
+          completedCycles: completed,
+          lastPeriodEnd: last?.periodEnd || null
+        };
+      }),
+      investmentsOnScheduledProjects: investments.length,
+      maturityEnabledInvestments: maturityEnabled,
+      totalReportRows: rows.length,
+      unpaidMaturedRows: matured.length,
+      sampleMatured: matured.slice(0, 5).map((r) => ({
+        investor: r.investorName,
+        project: r.projectTitle,
+        shares: r.shares,
+        profit: r.profitAmount,
+        cycle: r.currentCycleNumber,
+        maturityDate: r.maturityDate,
+        source: r.source
+      })),
+      hint: matured.length
+        ? 'Data looks OK — if the page still shows 0, hard-refresh or redeploy frontend/admin/maturity.html'
+        : (schedules.length === 0
+          ? 'No active Assign Profit schedules found'
+          : (investments.length === 0
+            ? 'Schedules exist but no active investments on those projects'
+            : 'Schedules/investments found but no completed cycles yet for today\'s date'))
+    });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: err.message, stack: err.stack });
   }
 });
 

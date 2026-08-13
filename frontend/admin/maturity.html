@@ -232,13 +232,18 @@
     };
 
     const loadCounts = async () => {
-      const c = await apiFetch('/maturity/counts');
-      document.getElementById('count-weekly').textContent = c.weeklyMatured;
-      document.getElementById('count-monthly').textContent = c.monthlyMatured;
-      document.getElementById('count-custom').textContent = c.customMatured;
-      document.getElementById('count-upcoming').textContent = c.upcoming;
-      document.getElementById('count-paid-today').textContent = c.paidToday;
-      return c;
+      try {
+        const c = await apiFetch('/maturity/counts');
+        document.getElementById('count-weekly').textContent = c.weeklyMatured;
+        document.getElementById('count-monthly').textContent = c.monthlyMatured;
+        document.getElementById('count-custom').textContent = c.customMatured;
+        document.getElementById('count-upcoming').textContent = c.upcoming;
+        document.getElementById('count-paid-today').textContent = c.paidToday;
+        return c;
+      } catch (err) {
+        showToast('Maturity counts failed: ' + err.message, 'error');
+        throw err;
+      }
     };
 
     const loadProjects = async () => {
@@ -267,7 +272,7 @@
         const data = await apiFetch(`/maturity?${qs}`);
         const items = data.items || [];
         if (!items.length) {
-          tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><h3>No records</h3><p>No investments match this maturity filter.</p></div></td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><h3>No records</h3><p id="empty-hint">No investments match this maturity filter.</p><p class="text-muted" style="margin-top:8px;font-size:0.85rem;">If you expected Aug 3→10 matured profits, open <code>/api/maturity/diagnose</code> (while logged in as admin) or hard-refresh after redeploying the server.</p></div></td></tr>`;
         } else {
           tbody.innerHTML = items.map(r => `
             <tr>

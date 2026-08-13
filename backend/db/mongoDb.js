@@ -1,6 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const dns = require('dns');
 const mongoose = require('mongoose');
+
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (_) {}
 const bcrypt = require('bcrypt');
 const {
   generateId, User, Project, Interest, Investment, Withdrawal, Payout, ProfitImage,
@@ -40,7 +45,7 @@ const connect = async () => {
     throw new Error('MONGO_URI is not set');
   }
   await mongoose.connect(process.env.MONGO_URI, {
-    serverSelectionTimeoutMS: 20000
+    serverSelectionTimeoutMS: 5000
   });
   console.log(`MongoDB connected: ${mongoose.connection.host}/${mongoose.connection.name}`);
 };
@@ -230,21 +235,58 @@ const DB = {
       const list = await User.find({ role: 'investor' }).lean();
       return list.map(stripPassword);
     },
-    listInvestorsWithStats: async () => {
-      const investors = await User.find({ role: 'investor' }).lean();
-      const investments = await Investment.find({}).lean();
-      const byInvestor = new Map();
-      for (const i of investments) {
-        if (!byInvestor.has(i.investorId)) byInvestor.set(i.investorId, []);
-        byInvestor.get(i.investorId).push(i);
+    listInvestorsWithStats: async (options = {}) => {
+      const {
+        search = '',
+        filter = '',
+        sort = 'createdAt',
+        order = 'desc',
+        page = 1,
+        limit = 25
+      } = options;
+
+      const [allInvestors, allInvestments, allProjects, allWallets, allWithdrawals, allLedger] = await Promise.all([
+        User.find({ role: 'investor' }).lean(),
+        Investment.find({}).lean(),
+        Project.find({}).lean(),
+        Wallet.find({}).lean(),
+        Withdrawal.find({}).lean(),
+        InvestorProfitLedger.find({}).lean()
+      ]);
+
+      const projectMap = new Map(allProjects.map(p => [p._id, p]));
+
+      const byInvestorInv = new Map();
+      for (const i of allInvestments) {
+        if (!byInvestorInv.has(i.investorId)) byInvestorInv.set(i.investorId, []);
+        byInvestorInv.get(i.investorId).push(i);
       }
 
-      return investors.map((inv) => {
-        const invInvestments = byInvestor.get(inv._id) || [];
+      const byInvestorWallet = new Map(allWallets.map(w => [w.investorId, w]));
+      const byInvestorWithdrawal = new Map();
+      for (const w of allWithdrawals) {
+        if (!byInvestorWithdrawal.has(w.investorId)) byInvestorWithdrawal.set(w.investorId, []);
+        byInvestorWithdrawal.get(w.investorId).push(w);
+      }
+
+      const byInvestorLedger = new Map();
+      for (const l of allLedger) {
+        if (!byInvestorLedger.has(l.investorId)) byInvestorLedger.set(l.investorId, []);
+        byInvestorLedger.get(l.investorId).push(l);
+      }
+
+      let enriched = allInvestors.map((inv) => {
+        const invInvestments = byInvestorInv.get(inv._id) || [];
+        const wallet = byInvestorWallet.get(inv._id) || null;
+        const withdrawals = byInvestorWithdrawal.get(inv._id) || [];
+        const ledger = byInvestorLedger.get(inv._id) || [];
+
         const projectIds = new Set(invInvestments.map(i => i.projectId).filter(Boolean));
         let totalShares = 0;
         let totalInvested = 0;
         let activeInvestments = 0;
+        let maturedInvestments = 0;
+
         for (const i of invInvestments) {
           if (['active', 'completed'].includes(i.status)) {
             totalShares += Number(i.sharesCount) || 0;
@@ -253,19 +295,144 @@ const DB = {
             totalInvested += Number(i.amount) || 0;
           }
           if (i.status === 'active') activeInvestments += 1;
+          if (i.status === 'completed' || (i.maturityDate && new Date(i.maturityDate) <= new Date())) {
+            maturedInvestments += 1;
+          }
         }
+
+        const returnEarnedStat = invInvestments.reduce((s, i) => s + (Number(i.returnEarned) || 0), 0);
+        const ledgerTotal = ledger.reduce((s, e) => s + (Number(e.calculatedProfit) || 0), 0);
+        const totalProfit = Math.max(returnEarnedStat, ledgerTotal);
+
+        const walletBalance = Number(wallet?.availableBalance) || 0;
+        const pendingWithdrawal = withdrawals
+          .filter(w => ['pending', 'approved', 'processing'].includes(w.status))
+          .reduce((s, w) => s + (Number(w.amount) || 0), 0);
+
+        // Referenced project titles for search
+        const projectTitles = [...projectIds].map(id => projectMap.get(id)?.title || '').filter(Boolean);
 
         return {
           ...stripPassword(inv),
+          accountStatus: inv.accountStatus || 'active',
           stats: {
             projectsCount: projectIds.size,
             investmentCount: invInvestments.length,
             totalShares,
             totalInvested,
-            activeInvestments
+            totalProfit,
+            walletBalance,
+            pendingWithdrawal,
+            activeInvestments,
+            maturedInvestments,
+            projectTitles
           }
         };
       });
+
+      // ── Search ──
+      const q = search.toLowerCase().trim();
+      if (q) {
+        enriched = enriched.filter(inv => {
+          const nameMatch = (inv.name || '').toLowerCase().includes(q);
+          const emailMatch = (inv.email || '').toLowerCase().includes(q);
+          const phoneMatch = (inv.phone || '').toLowerCase().includes(q);
+          const idMatch = (inv._id || '').toLowerCase().includes(q);
+          const projectMatch = inv.stats.projectTitles.some(t => t.toLowerCase().includes(q));
+          return nameMatch || emailMatch || phoneMatch || idMatch || projectMatch;
+        });
+      }
+
+      // ── Filter ──
+      if (filter) {
+        switch (filter) {
+          case 'active':
+            enriched = enriched.filter(i => i.accountStatus === 'active');
+            break;
+          case 'suspended':
+          case 'inactive':
+            enriched = enriched.filter(i => i.accountStatus === 'suspended' || i.accountStatus === 'inactive');
+            break;
+          case 'has_active_investment':
+            enriched = enriched.filter(i => i.stats.activeInvestments > 0);
+            break;
+          case 'no_investment':
+            enriched = enriched.filter(i => i.stats.investmentCount === 0);
+            break;
+          case 'has_pending_withdrawal':
+            enriched = enriched.filter(i => i.stats.pendingWithdrawal > 0);
+            break;
+          case 'has_matured_investment':
+            enriched = enriched.filter(i => i.stats.maturedInvestments > 0);
+            break;
+          case 'has_profit':
+            enriched = enriched.filter(i => i.stats.totalProfit > 0);
+            break;
+          case 'no_profit':
+            enriched = enriched.filter(i => i.stats.totalProfit === 0);
+            break;
+        }
+      }
+
+      // ── Sort ──
+      const dir = order === 'asc' ? 1 : -1;
+      enriched.sort((a, b) => {
+        let valA, valB;
+        switch (sort) {
+          case 'name':
+            valA = (a.name || '').toLowerCase();
+            valB = (b.name || '').toLowerCase();
+            return valA.localeCompare(valB) * dir;
+          case 'totalInvested':
+            valA = a.stats.totalInvested;
+            valB = b.stats.totalInvested;
+            break;
+          case 'totalProfit':
+            valA = a.stats.totalProfit;
+            valB = b.stats.totalProfit;
+            break;
+          case 'walletBalance':
+            valA = a.stats.walletBalance;
+            valB = b.stats.walletBalance;
+            break;
+          case 'investmentCount':
+            valA = a.stats.investmentCount;
+            valB = b.stats.investmentCount;
+            break;
+          case 'createdAt':
+          default:
+            valA = new Date(a.createdAt || 0).getTime();
+            valB = new Date(b.createdAt || 0).getTime();
+            break;
+        }
+        return (valA > valB ? 1 : valA < valB ? -1 : 0) * dir;
+      });
+
+      // ── Pagination ──
+      const total = enriched.length;
+      const p = Math.max(1, Number(page) || 1);
+      const l = Math.max(1, Number(limit) || 25);
+      const startIndex = (p - 1) * l;
+      const paginated = enriched.slice(startIndex, startIndex + l);
+
+      // Summary KPIs
+      const summary = {
+        totalInvestors: allInvestors.length,
+        activeInvestors: allInvestors.filter(u => (u.accountStatus || 'active') === 'active').length,
+        suspendedInvestors: allInvestors.filter(u => u.accountStatus === 'suspended').length,
+        totalInvested: enriched.reduce((s, i) => s + i.stats.totalInvested, 0),
+        totalProfit: enriched.reduce((s, i) => s + i.stats.totalProfit, 0),
+        totalShares: enriched.reduce((s, i) => s + i.stats.totalShares, 0)
+      };
+
+      return {
+        total,
+        page: p,
+        limit: l,
+        totalPages: Math.ceil(total / l) || 1,
+        summary,
+        investors: paginated
+      };
     },
     getInvestorById: async (id) => {
       const user = await User.findOne({ _id: id, role: 'investor' }).lean();

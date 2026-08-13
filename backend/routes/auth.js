@@ -154,8 +154,8 @@ const { adminOnly } = require('../middleware/adminOnly');
 
 router.get('/investors', protect, adminOnly, async (req, res) => {
   try {
-    const investors = await DB.users.listInvestorsWithStats();
-    res.json(investors);
+    const result = await DB.users.listInvestorsWithStats(req.query);
+    res.json(result);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

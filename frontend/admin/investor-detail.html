@@ -3,19 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Investor Details — Admin</title>
+  <title>Investor 360 Dashboard — Startup Box BD Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
   <style>
-    .investor-hero {
+    .inv-hero {
       display: flex;
       align-items: center;
-      gap: 18px;
+      justify-content: space-between;
+      gap: 20px;
       flex-wrap: wrap;
+      background: var(--bg-elevated);
+      padding: 24px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
       margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
     }
-    .investor-avatar-lg {
+    .inv-avatar-lg {
       width: 72px;
       height: 72px;
       border-radius: 50%;
@@ -28,27 +34,131 @@
       font-size: 1.8rem;
       flex-shrink: 0;
     }
-    .investor-meta p {
-      margin: 4px 0;
-      color: var(--text-secondary);
-      font-size: 0.92rem;
-    }
     .badge-status {
       display: inline-flex;
       align-items: center;
       gap: 5px;
       padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.78rem;
+      border-radius: 12px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-active { background: #D1FAE5; color: #065F46; }
+    .badge-suspended { background: #FEE2E2; color: #991B1B; }
+
+    .inv-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .inv-kpi-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+    .inv-kpi-card .lbl { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+    .inv-kpi-card .val { font-size: 1.5rem; font-weight: 800; margin-top: 4px; color: var(--navy); }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      margin-bottom: 24px;
+      padding-bottom: 2px;
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      border: none;
+      background: transparent;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      color: var(--text-muted);
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover { color: var(--navy); }
+    .tab-btn.active {
+      border-color: var(--gold);
+      color: var(--navy);
       font-weight: 700;
     }
-    .badge-active { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
-    .badge-suspended { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    .timeline-item {
+      position: relative;
+      padding-left: 28px;
+      padding-bottom: 20px;
+      border-left: 2px solid var(--border);
+      margin-left: 10px;
+    }
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -7px;
+      top: 2px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+    .timeline-item .t-time { font-size: 0.76rem; color: var(--text-muted); }
+    .timeline-item .t-title { font-size: 0.92rem; font-weight: 700; color: var(--navy); margin: 2px 0; }
+    .timeline-item .t-desc { font-size: 0.84rem; color: var(--text-secondary); }
+
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1100;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; visibility: hidden; transition: all 0.25s ease;
+    }
+    .modal-overlay.open { opacity: 1; visibility: visible; }
+    .modal-card {
+      background: var(--bg-base, #fff);
+      width: 90%; max-width: 580px;
+      border-radius: var(--radius);
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      overflow: hidden;
+    }
+    .modal-head {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--bg-elevated);
+    }
+    .modal-body { padding: 24px; max-height: 80vh; overflow-y: auto; }
+    .modal-foot {
+      padding: 16px 24px; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 10px;
+      background: var(--bg-elevated);
+    }
+
+    .integrity-banner {
+      background: #FEF3C7;
+      border: 1px solid #F59E0B;
+      color: #92400E;
+      padding: 12px 18px;
+      border-radius: var(--radius);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
   </style>
 </head>
 <body>
   <div class="admin-wrapper">
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" id="admin-sidebar">
       <div>
         <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
           <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
@@ -65,7 +175,8 @@
           <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
           <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
           <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
-          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investor Management</a>
+          <a href="/admin/data-health.html"><span class="nav-icon">🏥</span> Data Health Audit</a>
           <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
           <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
         </nav>
@@ -75,191 +186,640 @@
           <div class="admin-user-avatar" id="admin-avatar">A</div>
           <div>
             <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
-            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
           </div>
         </div>
-        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn" style="margin-top:12px;">Logout</button>
       </div>
     </aside>
 
-    <main class="admin-main-content">
-      <div class="admin-page-header">
-        <div class="flex gap-2" style="align-items:flex-start;">
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <div class="flex gap-2" style="align-items:center;">
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
-            <p style="margin-bottom:6px;"><a href="/admin/investor-list.html" style="color:var(--text-muted);">← Back to Investors</a></p>
-            <h2 id="page-title">Investor Details</h2>
-            <p>Portfolio overview, shares, and project allocations.</p>
+            <p style="margin:0 0 2px 0;font-size:0.8rem;"><a href="/admin/investor-list.html" style="color:var(--text-muted);">← Back to Investor Directory</a></p>
+            <h1 style="font-size:1.35rem;margin:0;" id="page-heading">Investor 360 Profile</h1>
           </div>
         </div>
+      </header>
+
+      <main class="admin-content">
+        <!-- Integrity Alert Banner -->
+        <div id="integrity-banner" class="integrity-banner" style="display:none;">
+          <div>
+            <strong>⚠️ Data Integrity Warning Detected</strong>
+            <p style="margin:2px 0 0 0;font-size:0.85rem;" id="integrity-msg">Anomalies found in investor financial mappings.</p>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline" id="integrity-btn">Inspect Issue</button>
+        </div>
+
+        <!-- Hero Header -->
+        <div class="inv-hero">
+          <div style="display:flex;align-items:center;gap:18px;">
+            <div class="inv-avatar-lg" id="inv-avatar">?</div>
+            <div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <h2 style="margin:0;font-size:1.4rem;" id="inv-name">Loading...</h2>
+                <span class="badge-status badge-active" id="inv-status-badge">Active</span>
+              </div>
+              <p class="text-muted" style="margin:4px 0 0 0;font-size:0.88rem;">
+                <span style="font-family:monospace;background:var(--bg-base);padding:2px 6px;border-radius:4px;" id="inv-id">INV-000000</span> |
+                <span id="inv-email">—</span> | <span id="inv-phone">—</span>
+              </p>
+              <p class="text-muted" style="margin:4px 0 0 0;font-size:0.8rem;" id="inv-joined">Registered: —</p>
+            </div>
+          </div>
+          <div class="flex gap-2" style="flex-wrap:wrap;">
+            <button type="button" class="btn btn-outline btn-sm" id="btn-edit-profile">✏️ Edit Profile</button>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-toggle-status">⏸ Suspend Account</button>
+            <button type="button" class="btn btn-outline btn-sm" id="btn-export">📄 Export Report</button>
+          </div>
+        </div>
+
+        <!-- 8 Authoritative Summary KPI Cards -->
+        <div class="inv-kpi-grid">
+          <div class="inv-kpi-card">
+            <div class="lbl">Total Invested</div>
+            <div class="val text-accent" id="kpi-invested">৳0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Total Shares</div>
+            <div class="val" id="kpi-shares">0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Active Projects</div>
+            <div class="val" id="kpi-active-projects">0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Total Profit Earned</div>
+            <div class="val text-success" id="kpi-profit">৳0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Available Wallet</div>
+            <div class="val" id="kpi-wallet">৳0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Pending Withdrawal</div>
+            <div class="val" style="color:#D97706;" id="kpi-pending-wth">৳0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Total Withdrawn</div>
+            <div class="val" id="kpi-withdrawn">৳0</div>
+          </div>
+          <div class="inv-kpi-card">
+            <div class="lbl">Matured Allocations</div>
+            <div class="val" id="kpi-matured">0</div>
+          </div>
+        </div>
+
+        <!-- Tabbed Interface (10 Tabs) -->
+        <div class="tab-bar">
+          <button class="tab-btn active" data-tab="overview">Overview</button>
+          <button class="tab-btn" data-tab="profile">Profile Details</button>
+          <button class="tab-btn" data-tab="investments">Investments</button>
+          <button class="tab-btn" data-tab="projects">Project Breakdown</button>
+          <button class="tab-btn" data-tab="profit">Profit Ledger</button>
+          <button class="tab-btn" data-tab="wallet">Wallet History</button>
+          <button class="tab-btn" data-tab="withdrawals">Withdrawals</button>
+          <button class="tab-btn" data-tab="maturity">Maturity Status</button>
+          <button class="tab-btn" data-tab="activity">Activity Timeline</button>
+          <button class="tab-btn" data-tab="notes">Admin Notes</button>
+        </div>
+
+        <!-- Tab 1: Overview -->
+        <div id="tab-overview" class="tab-panel active">
+          <div class="panel mb-3 p-3">
+            <h3 style="margin-bottom:12px;">Active Project Allocations Summary</h3>
+            <div id="overview-projects-wrap">
+              <p class="text-muted">Loading project breakdown...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Profile -->
+        <div id="tab-profile" class="tab-panel">
+          <div class="panel p-3 mb-3">
+            <div class="flex-between mb-3">
+              <h3>Investor Personal &amp; Identification Profile</h3>
+              <button type="button" class="btn btn-sm btn-outline" onclick="openEditModal()">✏️ Edit Profile</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;">
+              <div><strong>Full Name:</strong> <p id="p-name">—</p></div>
+              <div><strong>Email Address:</strong> <p id="p-email">—</p></div>
+              <div><strong>Phone Number:</strong> <p id="p-phone">—</p></div>
+              <div><strong>Date of Birth:</strong> <p id="p-dob">—</p></div>
+              <div><strong>Address:</strong> <p id="p-address">—</p></div>
+              <div><strong>NID / Ident:</strong> <p id="p-nid">—</p></div>
+              <div><strong>Account Status:</strong> <p id="p-status">—</p></div>
+              <div><strong>Joined Date:</strong> <p id="p-joined">—</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Investments -->
+        <div id="tab-investments" class="tab-panel">
+          <div class="panel">
+            <div class="panel-header"><h2>All Investment Allocations</h2></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Inv ID</th>
+                    <th>Project</th>
+                    <th>Amount</th>
+                    <th>Shares</th>
+                    <th>Start Date</th>
+                    <th>Status</th>
+                    <th>Return Earned</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-investments"><tr><td colspan="7">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Project Breakdown -->
+        <div id="tab-projects" class="tab-panel">
+          <div id="project-breakdown-cards" class="panel p-3">
+            <p class="text-muted">Loading breakdown...</p>
+          </div>
+        </div>
+
+        <!-- Tab 5: Profit History -->
+        <div id="tab-profit" class="tab-panel">
+          <div class="panel">
+            <div class="panel-header"><h2>Authoritative Investor Profit Ledger</h2></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Project ID</th>
+                    <th>Cycle #</th>
+                    <th>Shares</th>
+                    <th>Profit/Share</th>
+                    <th>Calculated Profit</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-profit"><tr><td colspan="6">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 6: Wallet -->
+        <div id="tab-wallet" class="tab-panel">
+          <div class="panel p-3">
+            <h3>Investor Wallet Statement</h3>
+            <p class="text-muted">Available Balance: <strong id="w-avail">৳0</strong></p>
+          </div>
+        </div>
+
+        <!-- Tab 7: Withdrawals -->
+        <div id="tab-withdrawals" class="tab-panel">
+          <div class="panel">
+            <div class="panel-header"><h2>Withdrawal Requests</h2></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Amount</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Requested Date</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-withdrawals"><tr><td colspan="5">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 8: Maturity -->
+        <div id="tab-maturity" class="tab-panel">
+          <div class="panel">
+            <div class="panel-header"><h2>Maturity Status &amp; Payoffs</h2></div>
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Investment ID</th>
+                    <th>Cycle #</th>
+                    <th>Profit</th>
+                    <th>Payoff Total</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tb-maturity"><tr><td colspan="5">Loading...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 9: Activity Timeline -->
+        <div id="tab-activity" class="tab-panel">
+          <div class="panel p-3">
+            <h3 style="margin-bottom:16px;">Investor Activity &amp; Audit Log Feed</h3>
+            <div id="timeline-wrap">Loading timeline...</div>
+          </div>
+        </div>
+
+        <!-- Tab 10: Admin Notes -->
+        <div id="tab-notes" class="tab-panel">
+          <div class="panel p-3">
+            <h3 style="margin-bottom:16px;">Internal Admin Notes (Private)</h3>
+            <form id="note-form" class="flex gap-2 mb-3">
+              <input type="text" id="note-input" class="form-input" placeholder="Add an internal note about this investor..." style="flex:1;">
+              <button type="submit" class="btn btn-primary">Add Note</button>
+            </form>
+            <div id="notes-list">Loading notes...</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Edit Profile Modal -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 style="margin:0;">Edit Investor Profile</h3>
+        <button type="button" class="btn btn-sm btn-outline" onclick="closeEditModal()" style="border:none;">✕</button>
       </div>
-
-      <div id="loading-state" class="panel panel-body">
-        <div class="skeleton skeleton-line lg"></div>
-        <div class="skeleton skeleton-line"></div>
-        <p class="text-muted mt-2">Loading investor details…</p>
-      </div>
-
-      <div id="detail-content" style="display:none;">
-        <div class="panel panel-body investor-hero">
-          <div class="investor-avatar-lg" id="inv-avatar">?</div>
-          <div class="investor-meta" style="flex:1;min-width:220px;">
-            <h2 id="inv-name" style="margin:0 0 6px;color:var(--navy);">—</h2>
-            <p id="inv-email">—</p>
-            <p id="inv-phone">—</p>
-            <p id="inv-joined">—</p>
-            <span class="badge-status badge-active" id="inv-status">Active</span>
+      <form id="edit-profile-form">
+        <div class="modal-body">
+          <div class="alert alert-info mb-3" style="font-size:0.8rem;">
+            🔒 <strong>Financial Data Protection</strong>: Financial balances, shares, and transaction ledgers are protected and cannot be edited via profile forms.
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Full Name</label>
+            <input type="text" id="ep-name" class="form-input" required>
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Email Address</label>
+            <input type="email" id="ep-email" class="form-input" required>
+            <small class="text-muted" id="ep-email-err" style="color:#DC2626;"></small>
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Phone Number</label>
+            <input type="text" id="ep-phone" class="form-input">
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Date of Birth</label>
+            <input type="date" id="ep-dob" class="form-input">
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Address</label>
+            <textarea id="ep-address" class="form-input" rows="2"></textarea>
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">NID / National ID</label>
+            <input type="text" id="ep-nid" class="form-input">
+          </div>
+          <div class="form-group mb-2">
+            <label class="form-label">Account Status</label>
+            <select id="ep-status" class="form-input">
+              <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
         </div>
-
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-label">Projects Invested</div>
-            <div class="kpi-value accent" id="kpi-projects">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Total Shares</div>
-            <div class="kpi-value" id="kpi-shares">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Total Invested</div>
-            <div class="kpi-value success" id="kpi-invested">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Active Investments</div>
-            <div class="kpi-value" id="kpi-active">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Return Earned</div>
-            <div class="kpi-value success" id="kpi-earned">—</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Available Balance</div>
-            <div class="kpi-value accent" id="kpi-balance">—</div>
-          </div>
+        <div class="modal-foot">
+          <button type="button" class="btn btn-outline" onclick="closeEditModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="ep-save-btn">Save Profile Changes</button>
         </div>
-
-        <div class="panel mt-3">
-          <div class="panel-header">
-            <h2>Project Allocations</h2>
-          </div>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Project</th>
-                  <th>Category</th>
-                  <th>Shares</th>
-                  <th>Amount</th>
-                  <th>ROI</th>
-                  <th>Duration</th>
-                  <th>Status</th>
-                  <th>Start Date</th>
-                </tr>
-              </thead>
-              <tbody id="investments-table">
-                <tr><td colspan="8"><div class="skeleton skeleton-line"></div></td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
+      </form>
+    </div>
   </div>
 
   <script src="/assets/js/api.js"></script>
-
-  <script src="/assets/js/admin-maturity-badge.js"></script>
   <script>
+    let investorId = null;
+    let data360 = null;
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('admin');
       if (!user) return;
 
       document.getElementById('admin-name').textContent = user.name || 'Admin';
       document.getElementById('admin-email').textContent = user.email || '';
-      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.admin-sidebar');
 
-      const investorId = new URLSearchParams(window.location.search).get('id');
+      const urlParams = new URLSearchParams(window.location.search);
+      investorId = urlParams.get('id');
+
       if (!investorId) {
-        showToast('No investor specified', 'error');
-        window.location.href = '/admin/investor-list.html';
+        showToast('No investor ID specified', 'error');
+        setTimeout(() => window.location.href = '/admin/investor-list.html', 1500);
         return;
       }
 
-      const formatDate = (d) => {
-        if (!d) return '—';
-        const dt = new Date(d);
-        return Number.isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-      };
+      // Tab switching
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+          btn.classList.add('active');
+          const tabId = btn.getAttribute('data-tab');
+          document.getElementById(`tab-${tabId}`).classList.add('active');
+        });
+      });
 
-      const invStatusClass = (status) => {
-        const s = String(status || 'pending').toLowerCase();
-        if (s === 'active') return 'inv-status inv-status-active';
-        if (s === 'completed') return 'inv-status inv-status-completed';
-        return 'inv-status inv-status-pending';
-      };
+      // Actions
+      document.getElementById('btn-edit-profile').addEventListener('click', openEditModal);
+      document.getElementById('btn-toggle-status').addEventListener('click', toggleStatus);
+      document.getElementById('btn-export').addEventListener('click', exportReport);
+      document.getElementById('note-form').addEventListener('submit', addNote);
+
+      await load360Data();
+    });
+
+    async function load360Data() {
+      try {
+        data360 = await apiFetch(`/admin/investors/${investorId}/360`);
+        const p = data360.profile;
+        const s = data360.summary;
+
+        // Render Hero Header
+        document.getElementById('inv-avatar').textContent = (p.name || '?').charAt(0).toUpperCase();
+        document.getElementById('inv-name').textContent = p.name || 'Unnamed Investor';
+        document.getElementById('inv-id').textContent = p._id;
+        document.getElementById('inv-email').textContent = p.email;
+        document.getElementById('inv-phone').textContent = p.phone || 'No phone';
+        document.getElementById('inv-joined').textContent = `Registered: ${p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '—'}`;
+
+        const isSusp = p.accountStatus === 'suspended';
+        document.getElementById('inv-status-badge').textContent = p.accountStatus || 'active';
+        document.getElementById('inv-status-badge').className = `badge-status ${isSusp ? 'badge-suspended' : 'badge-active'}`;
+        document.getElementById('btn-toggle-status').textContent = isSusp ? '✓ Activate Account' : '⏸ Suspend Account';
+
+        // Summary KPIs
+        document.getElementById('kpi-invested').textContent = formatMoney(s.totalInvested);
+        document.getElementById('kpi-shares').textContent = s.totalShares;
+        document.getElementById('kpi-active-projects').textContent = s.activeInvestmentsCount;
+        document.getElementById('kpi-profit').textContent = formatMoney(s.totalProfitEarned);
+        document.getElementById('kpi-wallet').textContent = formatMoney(s.walletBalance);
+        document.getElementById('kpi-pending-wth').textContent = formatMoney(s.pendingWithdrawal);
+        document.getElementById('kpi-withdrawn').textContent = formatMoney(s.totalWithdrawn);
+        document.getElementById('kpi-matured').textContent = s.maturedCount;
+
+        // Render Profile Tab
+        document.getElementById('p-name').textContent = p.name || '—';
+        document.getElementById('p-email').textContent = p.email || '—';
+        document.getElementById('p-phone').textContent = p.phone || '—';
+        document.getElementById('p-dob').textContent = p.dob || '—';
+        document.getElementById('p-address').textContent = p.address || '—';
+        document.getElementById('p-nid').textContent = p.nid || '—';
+        document.getElementById('p-status').textContent = p.accountStatus || 'active';
+        document.getElementById('p-joined').textContent = p.createdAt ? new Date(p.createdAt).toLocaleString() : '—';
+
+        // Render Investments Tab
+        renderInvestments(data360.investments || []);
+        renderProjectBreakdown(data360.projectBreakdown || []);
+        renderProfitLedger(data360.profitLedger || []);
+        renderWithdrawals(data360.withdrawals || []);
+        renderMaturity(data360.maturityPayoffs || []);
+        renderTimeline(data360.timeline || []);
+        renderNotes(data360.notes || []);
+
+        document.getElementById('w-avail').textContent = formatMoney(s.walletBalance);
+
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function renderInvestments(list) {
+      const tbody = document.getElementById('tb-investments');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No investments assigned.</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(inv => `
+        <tr>
+          <td><span style="font-family:monospace;">${inv._id}</span></td>
+          <td><strong>${escapeHtml(inv.project?.title || 'Unknown')}</strong></td>
+          <td>${formatMoney(inv.amount)}</td>
+          <td><strong>${inv.sharesCount || 0}</strong></td>
+          <td>${inv.startDate ? new Date(inv.startDate).toLocaleDateString() : '—'}</td>
+          <td><span class="badge-status badge-active">${inv.status}</span></td>
+          <td class="text-success">${formatMoney(inv.returnEarned || 0)}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderProjectBreakdown(list) {
+      const el = document.getElementById('project-breakdown-cards');
+      if (!list.length) {
+        el.innerHTML = `<p class="text-muted">No active project breakdowns found.</p>`;
+        return;
+      }
+      el.innerHTML = list.map(p => `
+        <div class="panel p-3 mb-2" style="border-left:4px solid var(--gold);">
+          <div class="flex-between">
+            <h4 style="margin:0;">${escapeHtml(p.projectTitle)}</h4>
+            <span class="badge-status badge-active">${p.frequency || 'Weekly'}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-top:10px;">
+            <div><small class="text-muted">Shares</small><br><strong>${p.shares}</strong></div>
+            <div><small class="text-muted">Capital Invested</small><br><strong>${formatMoney(p.capitalInvested)}</strong></div>
+            <div><small class="text-muted">Profit Per Share</small><br><strong>৳${p.profitPerShare}</strong></div>
+            <div><small class="text-muted">Total Profit Earned</small><br><strong class="text-success">${formatMoney(p.earnedSoFar)}</strong></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderProfitLedger(list) {
+      const tbody = document.getElementById('tb-profit');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">No profit records in ledger.</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(l => `
+        <tr>
+          <td>${l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '—'}</td>
+          <td><span style="font-family:monospace;">${l.projectId}</span></td>
+          <td>Cycle ${l.cycleNumber || 1}</td>
+          <td>${l.shares || 0}</td>
+          <td>৳${l.profitPerShare || 0}</td>
+          <td class="text-success"><strong>${formatMoney(l.calculatedProfit)}</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    function renderWithdrawals(list) {
+      const tbody = document.getElementById('tb-withdrawals');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">No withdrawal history.</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(w => `
+        <tr>
+          <td><span style="font-family:monospace;">${w._id}</span></td>
+          <td><strong>${formatMoney(w.amount)}</strong></td>
+          <td>${escapeHtml(w.paymentMethod || 'bKash')}</td>
+          <td><span class="badge-status ${w.status === 'completed' ? 'badge-active' : 'badge-suspended'}">${w.status}</span></td>
+          <td>${w.createdAt ? new Date(w.createdAt).toLocaleDateString() : '—'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function renderMaturity(list) {
+      const tbody = document.getElementById('tb-maturity');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">No maturity payoff records.</div></td></tr>`;
+        return;
+      }
+      tbody.innerHTML = list.map(m => `
+        <tr>
+          <td><span style="font-family:monospace;">${m.investmentId}</span></td>
+          <td>Cycle ${m.cycleNumber || 1}</td>
+          <td class="text-success">${formatMoney(m.profitAmount)}</td>
+          <td><strong>${formatMoney(m.totalPayoff)}</strong></td>
+          <td><span class="badge-status badge-active">${m.status}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    function renderTimeline(list) {
+      const el = document.getElementById('timeline-wrap');
+      if (!list.length) {
+        el.innerHTML = `<p class="text-muted">No recorded timeline events.</p>`;
+        return;
+      }
+      el.innerHTML = list.map(item => `
+        <div class="timeline-item">
+          <div class="t-time">${item.date ? new Date(item.date).toLocaleString() : '—'}</div>
+          <div class="t-title">${escapeHtml(item.title)}</div>
+          <div class="t-desc">${escapeHtml(item.description)}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderNotes(list) {
+      const el = document.getElementById('notes-list');
+      if (!list.length) {
+        el.innerHTML = `<p class="text-muted">No admin internal notes added yet.</p>`;
+        return;
+      }
+      el.innerHTML = list.map(n => `
+        <div class="panel p-2 mb-2" style="background:var(--bg-elevated);">
+          <div class="flex-between">
+            <strong style="font-size:0.85rem;">${escapeHtml(n.createdBy || 'Admin')}</strong>
+            <div class="flex gap-2" style="align-items:center;">
+              <small class="text-muted">${n.createdAt ? new Date(n.createdAt).toLocaleDateString() : ''}</small>
+              <button type="button" class="btn btn-sm btn-outline" onclick="deleteNote('${n.id}')" style="padding:1px 6px;font-size:0.75rem;">✕</button>
+            </div>
+          </div>
+          <p style="margin:4px 0 0 0;font-size:0.88rem;">${escapeHtml(n.text)}</p>
+        </div>
+      `).join('');
+    }
+
+    async function addNote(e) {
+      e.preventDefault();
+      const input = document.getElementById('note-input');
+      const text = input.value.trim();
+      if (!text) return;
 
       try {
-        const [investor, portfolio, investments] = await Promise.all([
-          apiFetch(`/auth/investors/${investorId}`),
-          apiFetch(`/investments/stats?investorId=${encodeURIComponent(investorId)}`),
-          apiFetch(`/investments/my?investorId=${encodeURIComponent(investorId)}`)
-        ]);
-
-        document.getElementById('loading-state').style.display = 'none';
-        document.getElementById('detail-content').style.display = 'block';
-
-        const isSuspended = investor.accountStatus === 'suspended';
-        document.getElementById('page-title').textContent = investor.name || 'Investor Details';
-        document.getElementById('inv-avatar').textContent = (investor.name || '?').charAt(0).toUpperCase();
-        document.getElementById('inv-name').textContent = investor.name || '—';
-        document.getElementById('inv-email').textContent = investor.email || '—';
-        document.getElementById('inv-phone').textContent = investor.phone ? `Phone: ${investor.phone}` : 'Phone: —';
-        document.getElementById('inv-joined').textContent = investor.createdAt
-          ? `Joined: ${formatDate(investor.createdAt)}`
-          : 'Joined: —';
-
-        const statusEl = document.getElementById('inv-status');
-        statusEl.textContent = isSuspended ? 'Suspended' : 'Active';
-        statusEl.className = `badge-status ${isSuspended ? 'badge-suspended' : 'badge-active'}`;
-
-        if (isSuspended) {
-          document.getElementById('inv-avatar').style.background = 'linear-gradient(135deg, #94a3b8, #64748b)';
-          document.getElementById('inv-avatar').style.color = '#fff';
-        }
-
-        document.getElementById('kpi-projects').textContent = investor.stats?.projectsCount ?? 0;
-        document.getElementById('kpi-shares').textContent = Number(portfolio.totalShares || 0).toLocaleString();
-        document.getElementById('kpi-invested').textContent = formatMoney(portfolio.totalInvested || 0);
-        document.getElementById('kpi-active').textContent = portfolio.activeInvestments ?? 0;
-        document.getElementById('kpi-earned').textContent = formatMoney(portfolio.totalReturnEarned || 0);
-        document.getElementById('kpi-balance').textContent = formatMoney(portfolio.availableBalance || 0);
-
-        const tbody = document.getElementById('investments-table');
-        if (!investments.length) {
-          tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No investments yet</h3><p>This investor has not been assigned to any projects.</p></div></td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = investments.map((inv) => `
-          <tr>
-            <td data-label="Project"><strong>${escapeHtml(inv.project?.title || 'Deleted Project')}</strong></td>
-            <td data-label="Category">${escapeHtml(inv.project?.category || '—')}</td>
-            <td data-label="Shares" style="font-weight:700;">${Number(inv.sharesCount || 0).toLocaleString()}</td>
-            <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(inv.amount)}</td>
-            <td data-label="ROI">${escapeHtml(String(inv.roi ?? '—'))}${inv.roi != null ? '%' : ''}</td>
-            <td data-label="Duration">${escapeHtml(inv.durationLabel || inv.duration || '—')}</td>
-            <td data-label="Status"><span class="${invStatusClass(inv.status)}">${escapeHtml(inv.status || 'pending')}</span></td>
-            <td data-label="Start Date">${formatDate(inv.startDate)}</td>
-          </tr>`).join('');
+        const res = await apiFetch(`/admin/investors/${investorId}/notes`, {
+          method: 'POST',
+          body: JSON.stringify({ text })
+        });
+        input.value = '';
+        renderNotes(res.notes);
+        showToast('Internal note saved', 'success');
       } catch (err) {
-        document.getElementById('loading-state').innerHTML =
-          `<div class="empty-state"><h3>Unable to load investor</h3><p>${escapeHtml(err.message)}</p><a href="/admin/investor-list.html" class="btn btn-sm mt-2">Back to list</a></div>`;
+        showToast(err.message, 'error');
+      }
+    }
+
+    async function deleteNote(noteId) {
+      try {
+        const res = await apiFetch(`/admin/investors/${investorId}/notes/${noteId}`, { method: 'DELETE' });
+        renderNotes(res.notes);
+        showToast('Note deleted', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function openEditModal() {
+      if (!data360) return;
+      const p = data360.profile;
+      document.getElementById('ep-name').value = p.name || '';
+      document.getElementById('ep-email').value = p.email || '';
+      document.getElementById('ep-phone').value = p.phone || '';
+      document.getElementById('ep-dob').value = p.dob || '';
+      document.getElementById('ep-address').value = p.address || '';
+      document.getElementById('ep-nid').value = p.nid || '';
+      document.getElementById('ep-status').value = p.accountStatus || 'active';
+      document.getElementById('edit-modal').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.remove('open');
+    }
+
+    document.getElementById('edit-profile-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('ep-name').value.trim();
+      const email = document.getElementById('ep-email').value.trim();
+      const phone = document.getElementById('ep-phone').value.trim();
+      const dob = document.getElementById('ep-dob').value;
+      const address = document.getElementById('ep-address').value.trim();
+      const nid = document.getElementById('ep-nid').value.trim();
+      const accountStatus = document.getElementById('ep-status').value;
+
+      try {
+        await apiFetch(`/admin/investors/${investorId}/profile`, {
+          method: 'PUT',
+          body: JSON.stringify({ name, email, phone, dob, address, nid, accountStatus })
+        });
+        showToast('Investor profile updated cleanly', 'success');
+        closeEditModal();
+        await load360Data();
+      } catch (err) {
         showToast(err.message, 'error');
       }
     });
+
+    async function toggleStatus() {
+      const isSusp = data360?.profile?.accountStatus === 'suspended';
+      const action = isSusp ? 'activate' : 'suspend';
+      const confirmed = await confirmDialog(
+        `Are you sure you want to ${action} this investor account?`,
+        { title: `${action.toUpperCase()} Investor`, confirmText: action.toUpperCase(), danger: !isSusp }
+      );
+      if (!confirmed) return;
+
+      try {
+        await apiFetch(`/auth/investors/${investorId}/suspend`, { method: 'PUT' });
+        showToast(`Investor ${action}d`, 'success');
+        await load360Data();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
+
+    function exportReport() {
+      if (!data360) return;
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data360, null, 2));
+      const dlAnchorElem = document.createElement('a');
+      dlAnchorElem.setAttribute("href", dataStr);
+      dlAnchorElem.setAttribute("download", `investor_360_${investorId}.json`);
+      document.body.appendChild(dlAnchorElem);
+      dlAnchorElem.click();
+      dlAnchorElem.remove();
+      showToast('Investor 360 Report exported', 'success');
+    }
   </script>
 </body>
 </html>

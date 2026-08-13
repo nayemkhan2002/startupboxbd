@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Investors — Admin</title>
+  <title>Investor Management — Startup Box BD Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/assets/css/main.css">
   <link rel="stylesheet" href="/assets/css/admin.css">
@@ -12,66 +12,145 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.78rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 0.03em;
-      text-transform: capitalize;
+      text-transform: uppercase;
     }
-    .badge-active {
-      background: rgba(46, 204, 113, 0.12);
-      color: #2ecc71;
+    .badge-active { background: #D1FAE5; color: #065F46; }
+    .badge-suspended { background: #FEE2E2; color: #991B1B; }
+    .badge-inactive { background: #E2E8F0; color: #475569; }
+
+    .investor-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
     }
-    .badge-suspended {
-      background: rgba(231, 76, 60, 0.12);
-      color: #e74c3c;
+    .investor-kpi-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow-sm);
     }
-    .action-btns {
+    .investor-kpi-card .kpi-lbl {
+      font-size: 0.76rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .investor-kpi-card .kpi-val {
+      font-size: 1.45rem;
+      font-weight: 800;
+      margin-top: 4px;
+      color: var(--navy);
+    }
+
+    .filter-bar {
       display: flex;
-      gap: 6px;
       flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      background: var(--bg-elevated);
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
     }
-    .action-btns .btn {
-      padding: 5px 12px;
-      font-size: 0.78rem;
+
+    /* Side Drawer */
+    .drawer-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(3px);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+    }
+    .drawer-overlay.open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .drawer-panel {
+      position: fixed;
+      top: 0; right: 0; bottom: 0;
+      width: 100%;
+      max-width: 480px;
+      background: var(--bg-base, #fff);
+      z-index: 1001;
+      box-shadow: -8px 0 25px rgba(0,0,0,0.15);
+      transform: translateX(100%);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer-overlay.open .drawer-panel {
+      transform: translateX(0);
+    }
+    .drawer-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-elevated);
+    }
+    .drawer-body {
+      padding: 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .drawer-footer {
+      padding: 16px 24px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-elevated);
+      display: flex;
+      gap: 10px;
+    }
+
+    .qv-kpi-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0;
+    }
+    .qv-kpi-card {
+      background: var(--bg-elevated);
+      padding: 12px 14px;
       border-radius: 8px;
+      border: 1px solid var(--border);
     }
-    .btn-warn {
-      background: linear-gradient(135deg, #f39c12, #e67e22);
-      color: #fff;
-      border: none;
+    .qv-kpi-card .lbl { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+    .qv-kpi-card .val { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 16px;
+      padding: 12px 0;
+      font-size: 0.85rem;
     }
-    .btn-warn:hover {
-      background: linear-gradient(135deg, #e67e22, #d35400);
-      transform: translateY(-1px);
-    }
-    .btn-danger {
-      background: linear-gradient(135deg, #e74c3c, #c0392b);
-      color: #fff;
-      border: none;
-    }
-    .btn-danger:hover {
-      background: linear-gradient(135deg, #c0392b, #a93226);
-      transform: translateY(-1px);
-    }
-    .btn-success-outline {
-      background: transparent;
-      color: #2ecc71;
-      border: 1px solid #2ecc71;
-    }
-    .btn-success-outline:hover {
-      background: rgba(46, 204, 113, 0.1);
-      transform: translateY(-1px);
-    }
-    .investor-row-suspended {
-      opacity: 0.65;
+
+    .investor-id-tag {
+      font-family: monospace;
+      font-size: 0.78rem;
+      background: var(--bg-elevated);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
     }
   </style>
 </head>
 <body>
   <div class="admin-wrapper">
-    <aside class="admin-sidebar">
+    <aside class="admin-sidebar" id="admin-sidebar">
       <div>
         <a href="/admin/dashboard.html" class="brand brand-logo" aria-label="Startup Box Bangladesh Admin">
           <img src="/logo/573511680_122109541731029651_7139585141034658401_n.jpg" alt="" class="brand-logo-img">
@@ -88,7 +167,8 @@
           <a href="/admin/payouts.html"><span class="nav-icon">💰</span> Profit Payouts</a>
           <a href="/admin/investments.html"><span class="nav-icon">◈</span> Investments</a>
           <a href="/admin/withdrawals.html"><span class="nav-icon">⇄</span> Withdrawals</a>
-          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investors</a>
+          <a href="/admin/investor-list.html" class="active"><span class="nav-icon">👥</span> Investor Management</a>
+          <a href="/admin/data-health.html"><span class="nav-icon">🏥</span> Data Health Audit</a>
           <a href="/admin/investors.html"><span class="nav-icon">◉</span> Interests</a>
           <a href="/admin/admins.html"><span class="nav-icon">🛡️</span> Admins</a>
         </nav>
@@ -98,257 +178,368 @@
           <div class="admin-user-avatar" id="admin-avatar">A</div>
           <div>
             <strong style="display:block;font-size:0.9rem;" id="admin-name">Admin</strong>
-            <small style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
+            <small class="text-muted" style="font-size:0.75rem;color:rgba(255,255,255,0.45);" id="admin-email">—</small>
           </div>
         </div>
-        <button id="logout-btn" class="btn btn-outline btn-block btn-sm">Logout</button>
+        <button type="button" class="btn btn-outline btn-block btn-sm" id="logout-btn" style="margin-top:12px;">Logout</button>
       </div>
     </aside>
 
-    <main class="admin-main-content">
-      <div class="admin-page-header">
-        <div class="flex gap-2" style="align-items:flex-start;">
+    <div class="admin-main">
+      <header class="admin-topbar">
+        <div class="flex gap-2" style="align-items:center;">
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
-            <h2>Registered Investors</h2>
-            <p>All investor accounts on the platform.</p>
+            <h1 style="font-size:1.35rem;margin:0;">Investor Management Directory</h1>
+            <p class="text-muted" style="margin:2px 0 0 0;font-size:0.85rem;">Authoritative directory of all registered investors, active shares, and portfolios</p>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div class="kpi-grid" id="investor-kpis">
-        <div class="kpi-card">
-          <div class="kpi-label">Total Investors</div>
-          <div class="kpi-value accent" id="kpi-total">—</div>
+      <main class="admin-content">
+        <!-- Summary KPI Cards -->
+        <div class="investor-kpi-grid">
+          <div class="investor-kpi-card">
+            <div class="kpi-lbl">Total Investors</div>
+            <div class="kpi-val" id="kpi-total">—</div>
+          </div>
+          <div class="investor-kpi-card">
+            <div class="kpi-lbl">Active Investors</div>
+            <div class="kpi-val text-success" id="kpi-active">—</div>
+          </div>
+          <div class="investor-kpi-card">
+            <div class="kpi-lbl">Total Invested</div>
+            <div class="kpi-val text-accent" id="kpi-invested">—</div>
+          </div>
+          <div class="investor-kpi-card">
+            <div class="kpi-lbl">Total Shares</div>
+            <div class="kpi-val" id="kpi-shares">—</div>
+          </div>
+          <div class="investor-kpi-card">
+            <div class="kpi-lbl">Total Profit Distributed</div>
+            <div class="kpi-val text-success" id="kpi-profit">—</div>
+          </div>
         </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Active</div>
-          <div class="kpi-value success" id="kpi-active">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Suspended</div>
-          <div class="kpi-value" id="kpi-suspended" style="color:#e74c3c;">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Joined This Month</div>
-          <div class="kpi-value" id="kpi-this-month">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Total Shares (All)</div>
-          <div class="kpi-value accent" id="kpi-total-shares">—</div>
-        </div>
-        <div class="kpi-card">
-          <div class="kpi-label">Total Invested (All)</div>
-          <div class="kpi-value success" id="kpi-total-invested">—</div>
-        </div>
-      </div>
 
-      <!-- Search -->
-      <div class="panel" style="margin-bottom:0;padding:16px 20px;">
-        <input type="text" id="search-input" class="form-control" placeholder="Search by name or email…" style="max-width:380px;">
-      </div>
+        <!-- Filter & Search Bar -->
+        <div class="filter-bar">
+          <div style="flex:1;min-width:240px;">
+            <input type="text" id="search-input" class="form-input" placeholder="Search by Name, Email, Phone, Investor ID, Project title..." style="font-size:0.88rem;">
+          </div>
+          <div style="width:170px;">
+            <select id="filter-select" class="form-input" style="font-size:0.88rem;">
+              <option value="">All Investors</option>
+              <option value="active">Active Only</option>
+              <option value="suspended">Suspended Only</option>
+              <option value="has_active_investment">Has Active Investment</option>
+              <option value="no_investment">No Investment</option>
+              <option value="has_pending_withdrawal">Pending Withdrawal</option>
+              <option value="has_profit">Has Profit</option>
+            </select>
+          </div>
+          <div style="width:160px;">
+            <select id="sort-select" class="form-input" style="font-size:0.88rem;">
+              <option value="createdAt">Sort by: Joined Date</option>
+              <option value="name">Sort by: Name</option>
+              <option value="totalInvested">Sort by: Total Invested</option>
+              <option value="totalProfit">Sort by: Total Profit</option>
+              <option value="walletBalance">Sort by: Wallet Balance</option>
+            </select>
+          </div>
+          <div style="width:100px;">
+            <select id="order-select" class="form-input" style="font-size:0.88rem;">
+              <option value="desc">Desc ⬇</option>
+              <option value="asc">Asc ⬆</option>
+            </select>
+          </div>
+        </div>
 
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Projects</th>
-                <th>Shares</th>
-                <th>Invested</th>
-                <th>Status</th>
-                <th>Joined</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="investors-table">
-              <tr><td colspan="10"><div class="skeleton skeleton-line"></div></td></tr>
-            </tbody>
-          </table>
+        <!-- Investors Table Panel -->
+        <div class="panel">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Investor ID</th>
+                  <th>Investor</th>
+                  <th>Contact</th>
+                  <th>Status</th>
+                  <th>Projects / Shares</th>
+                  <th>Total Invested</th>
+                  <th>Total Profit</th>
+                  <th>Wallet Balance</th>
+                  <th>Pending Wth.</th>
+                  <th>Joined Date</th>
+                  <th style="text-align:right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="investors-tbody">
+                <tr><td colspan="11"><div class="empty-state" style="padding:24px;"><p>Loading investors...</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination Bar -->
+          <div class="pagination-bar" style="padding:14px 20px;">
+            <div class="text-muted" id="page-info">Showing 0–0 of 0 investors</div>
+            <div class="flex gap-2" style="align-items:center;">
+              <button type="button" class="btn btn-sm btn-outline" id="prev-btn" disabled>← Previous</button>
+              <span id="page-num" style="font-weight:600;">Page 1</span>
+              <button type="button" class="btn btn-sm btn-outline" id="next-btn" disabled>Next →</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- Side Quick View Drawer -->
+  <div class="drawer-overlay" id="drawer-overlay">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div>
+          <h3 style="margin:0;font-size:1.1rem;" id="qv-name">Investor Quick View</h3>
+          <span class="investor-id-tag" id="qv-id">INV-000000</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" id="drawer-close-btn" style="border:none;font-size:1.2rem;">✕</button>
+      </div>
+      <div class="drawer-body" id="qv-body">
+        <div class="text-center p-3">
+          <p class="text-muted">Loading quick details...</p>
         </div>
       </div>
-    </main>
+      <div class="drawer-footer">
+        <a id="qv-full-btn" href="#" class="btn btn-primary btn-block">Open Full Investor 360 →</a>
+      </div>
+    </div>
   </div>
 
   <script src="/assets/js/api.js"></script>
-
-  <script src="/assets/js/admin-maturity-badge.js"></script>
   <script>
+    let currentPage = 1;
+    let searchTimeout = null;
+    let currentData = null;
+
     document.addEventListener('DOMContentLoaded', async () => {
       const user = checkAuth('admin');
       if (!user) return;
 
       document.getElementById('admin-name').textContent = user.name || 'Admin';
       document.getElementById('admin-email').textContent = user.email || '';
-      document.getElementById('admin-avatar').textContent = (user.name || 'A').charAt(0).toUpperCase();
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.admin-sidebar');
 
-      let investors = [];
+      // Bind Search / Filters
+      document.getElementById('search-input').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => { currentPage = 1; fetchInvestors(); }, 300);
+      });
+      document.getElementById('filter-select').addEventListener('change', () => { currentPage = 1; fetchInvestors(); });
+      document.getElementById('sort-select').addEventListener('change', () => { currentPage = 1; fetchInvestors(); });
+      document.getElementById('order-select').addEventListener('change', () => { currentPage = 1; fetchInvestors(); });
 
-      const updateKpis = () => {
-        document.getElementById('kpi-total').textContent = investors.length;
-        const active = investors.filter(inv => (inv.accountStatus || 'active') === 'active');
-        const suspended = investors.filter(inv => inv.accountStatus === 'suspended');
-        document.getElementById('kpi-active').textContent = active.length;
-        document.getElementById('kpi-suspended').textContent = suspended.length;
-        const now = new Date();
-        const thisMonth = investors.filter(inv => {
-          if (!inv.createdAt) return false;
-          const d = new Date(inv.createdAt);
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        });
-        document.getElementById('kpi-this-month').textContent = thisMonth.length;
-        document.getElementById('kpi-total-shares').textContent =
-          investors.reduce((sum, inv) => sum + (inv.stats?.totalShares || 0), 0).toLocaleString();
-        document.getElementById('kpi-total-invested').textContent = formatMoney(
-          investors.reduce((sum, inv) => sum + (inv.stats?.totalInvested || 0), 0)
-        );
-      };
+      document.getElementById('prev-btn').addEventListener('click', () => { if (currentPage > 1) { currentPage--; fetchInvestors(); } });
+      document.getElementById('next-btn').addEventListener('click', () => { if (currentData && currentPage < currentData.totalPages) { currentPage++; fetchInvestors(); } });
 
-      const render = (list) => {
-        const tbody = document.getElementById('investors-table');
-        if (!list.length) {
-          tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><h3>No investors yet</h3><p>Registered investor accounts will appear here.</p></div></td></tr>`;
-          return;
+      // Close side drawer
+      document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
+      document.getElementById('drawer-overlay').addEventListener('click', (e) => {
+        if (e.target.id === 'drawer-overlay') closeDrawer();
+      });
+
+      await fetchInvestors();
+    });
+
+    async function fetchInvestors() {
+      const tbody = document.getElementById('investors-tbody');
+      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state" style="padding:24px;"><p>Loading investors...</p></div></td></tr>`;
+
+      const q = document.getElementById('search-input').value.trim();
+      const filter = document.getElementById('filter-select').value;
+      const sort = document.getElementById('sort-select').value;
+      const order = document.getElementById('order-select').value;
+
+      const params = new URLSearchParams({
+        page: currentPage,
+        limit: 15,
+        sort,
+        order
+      });
+      if (q) params.set('search', q);
+      if (filter) params.set('filter', filter);
+
+      try {
+        const res = await apiFetch(`/auth/investors?${params.toString()}`);
+        currentData = res;
+
+        // Render Summary KPIs
+        if (res.summary) {
+          document.getElementById('kpi-total').textContent = res.summary.totalInvestors;
+          document.getElementById('kpi-active').textContent = res.summary.activeInvestors;
+          document.getElementById('kpi-invested').textContent = formatMoney(res.summary.totalInvested);
+          document.getElementById('kpi-shares').textContent = Number(res.summary.totalShares).toLocaleString();
+          document.getElementById('kpi-profit').textContent = formatMoney(res.summary.totalProfit);
         }
-        tbody.innerHTML = list.map((inv, idx) => {
-          const status = inv.accountStatus || 'active';
-          const isSuspended = status === 'suspended';
-          const stats = inv.stats || {};
-          return `
-          <tr class="${isSuspended ? 'investor-row-suspended' : ''}">
-            <td style="color:var(--text-muted);font-weight:600;">${idx + 1}</td>
+
+        renderTable(res.investors || []);
+
+        // Pagination controls
+        const start = res.total ? (res.page - 1) * res.limit + 1 : 0;
+        const end = Math.min(res.total, res.page * res.limit);
+        document.getElementById('page-info').textContent = `Showing ${start}–${end} of ${res.total} investors`;
+        document.getElementById('page-num').textContent = `Page ${res.page} of ${res.totalPages}`;
+        document.getElementById('prev-btn').disabled = res.page <= 1;
+        document.getElementById('next-btn').disabled = res.page >= res.totalPages;
+
+      } catch (err) {
+        showToast(err.message, 'error');
+        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state" style="padding:24px;"><p class="text-danger">Failed to load investors: ${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('investors-tbody');
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state" style="padding:24px;"><p>No investors matching your search criteria.</p></div></td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(inv => {
+        const status = inv.accountStatus || 'active';
+        const isSuspended = status === 'suspended';
+        const statusClass = isSuspended ? 'badge-suspended' : (status === 'inactive' ? 'badge-inactive' : 'badge-active');
+        const stats = inv.stats || {};
+        const initial = (inv.name || inv.email || '?').charAt(0).toUpperCase();
+
+        return `
+          <tr style="cursor:pointer;" onclick="handleRowClick(event, '${escapeHtml(inv._id)}')">
+            <td><span class="investor-id-tag">${escapeHtml(inv._id)}</span></td>
             <td>
               <div style="display:flex;align-items:center;gap:10px;">
                 <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,${isSuspended ? '#94a3b8,#64748b' : 'var(--gold),#E8950F'});color:${isSuspended ? '#fff' : 'var(--navy)'};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;">
-                  ${escapeHtml((inv.name || '?').charAt(0).toUpperCase())}
+                  ${escapeHtml(initial)}
                 </div>
-                <strong>${escapeHtml(inv.name || '—')}</strong>
+                <div>
+                  <strong>${escapeHtml(inv.name || '—')}</strong><br>
+                  <small class="text-muted">${escapeHtml(inv.email)}</small>
+                </div>
               </div>
             </td>
-            <td><a href="mailto:${escapeHtml(inv.email)}" style="color:var(--gold);">${escapeHtml(inv.email)}</a></td>
             <td>${escapeHtml(inv.phone || '—')}</td>
-            <td><strong>${stats.projectsCount || 0}</strong><br><small class="text-muted">${stats.investmentCount || 0} allocation${(stats.investmentCount || 0) === 1 ? '' : 's'}</small></td>
-            <td style="font-weight:700;color:var(--navy);">${Number(stats.totalShares || 0).toLocaleString()}</td>
-            <td style="color:var(--gold);font-weight:700;">${formatMoney(stats.totalInvested || 0)}</td>
-            <td>
-              <span class="badge-status ${isSuspended ? 'badge-suspended' : 'badge-active'}">
-                <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block;"></span>
-                ${isSuspended ? 'Suspended' : 'Active'}
-              </span>
-            </td>
-            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
-            <td>
-              <div class="action-btns">
-                <a href="/admin/investor-detail.html?id=${encodeURIComponent(inv._id)}" class="btn btn-sm" title="View full investor details">View</a>
-                <button class="btn ${isSuspended ? 'btn-success-outline' : 'btn-warn'} btn-sm btn-suspend" data-id="${escapeHtml(inv._id)}" title="${isSuspended ? 'Activate this investor' : 'Suspend this investor'}">
-                  ${isSuspended ? '✓ Activate' : '⏸ Suspend'}
-                </button>
-                <button class="btn btn-danger btn-sm btn-delete" data-id="${escapeHtml(inv._id)}" data-name="${escapeHtml(inv.name || inv.email)}" title="Delete this investor permanently">
-                  🗑 Delete
+            <td><span class="badge-status ${statusClass}">${status}</span></td>
+            <td><strong>${stats.projectsCount || 0}</strong> projects<br><small class="text-muted">${stats.totalShares || 0} shares</small></td>
+            <td><strong style="color:var(--navy);">${formatMoney(stats.totalInvested)}</strong></td>
+            <td><strong class="text-success">${formatMoney(stats.totalProfit)}</strong></td>
+            <td>${formatMoney(stats.walletBalance)}</td>
+            <td>${stats.pendingWithdrawal > 0 ? `<strong style="color:#D97706;">${formatMoney(stats.pendingWithdrawal)}</strong>` : '—'}</td>
+            <td>${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
+            <td style="text-align:right;" onclick="event.stopPropagation();">
+              <div class="flex gap-1" style="justify-content:flex-end;">
+                <a href="/admin/investor-detail.html?id=${encodeURIComponent(inv._id)}" class="btn btn-sm btn-primary">View 360</a>
+                <button type="button" class="btn btn-sm btn-outline" onclick="openQuickView('${escapeHtml(inv._id)}')">Quick View</button>
+                <button type="button" class="btn btn-sm ${isSuspended ? 'btn-success' : 'btn-outline'}" onclick="toggleSuspend('${escapeHtml(inv._id)}', ${isSuspended})">
+                  ${isSuspended ? 'Activate' : 'Suspend'}
                 </button>
               </div>
             </td>
-          </tr>`;
-        }).join('');
-      };
+          </tr>
+        `;
+      }).join('');
+    }
 
-      const loadInvestors = async () => {
-        try {
-          investors = await apiFetch('/auth/investors');
-          updateKpis();
-          render(investors);
-        } catch (err) {
-          console.error(err);
-          showToast(err.message, 'error');
-        }
-      };
+    function handleRowClick(e, id) {
+      if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON') return;
+      openQuickView(id);
+    }
 
-      await loadInvestors();
+    async function openQuickView(id) {
+      const overlay = document.getElementById('drawer-overlay');
+      const body = document.getElementById('qv-body');
+      document.getElementById('qv-name').textContent = 'Loading Investor...';
+      document.getElementById('qv-id').textContent = id;
+      document.getElementById('qv-full-btn').href = `/admin/investor-detail.html?id=${encodeURIComponent(id)}`;
 
-      // Search filter
-      document.getElementById('search-input').addEventListener('input', (e) => {
-        const q = e.target.value.toLowerCase().trim();
-        if (!q) {
-          render(investors);
-          return;
-        }
-        const filtered = investors.filter(inv =>
-          (inv.name || '').toLowerCase().includes(q) ||
-          (inv.email || '').toLowerCase().includes(q)
-        );
-        render(filtered);
-      });
+      overlay.classList.add('open');
+      body.innerHTML = `<div style="padding:24px;text-align:center;"><p class="text-muted">Fetching investor profile &amp; financial summary...</p></div>`;
 
-      // Delegate suspend + delete clicks
-      document.getElementById('investors-table').addEventListener('click', async (e) => {
-        const suspendBtn = e.target.closest('.btn-suspend');
-        const deleteBtn = e.target.closest('.btn-delete');
+      try {
+        const data = await apiFetch(`/admin/investors/${id}/360`);
+        const p = data.profile;
+        const s = data.summary;
 
-        if (suspendBtn) {
-          const id = suspendBtn.getAttribute('data-id');
-          const inv = investors.find(i => i._id === id);
-          const isSuspended = inv && inv.accountStatus === 'suspended';
-          const action = isSuspended ? 'activate' : 'suspend';
+        document.getElementById('qv-name').textContent = p.name || p.email;
 
-          const confirmed = await confirmDialog(
-            `Are you sure you want to ${action} this investor?`,
-            { title: `${action.charAt(0).toUpperCase() + action.slice(1)} Investor`, confirmText: action.charAt(0).toUpperCase() + action.slice(1), danger: !isSuspended }
-          );
-          if (!confirmed) return;
+        body.innerHTML = `
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+            <div style="width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#E8950F);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.3rem;">
+              ${escapeHtml((p.name || '?').charAt(0).toUpperCase())}
+            </div>
+            <div>
+              <h3 style="margin:0;">${escapeHtml(p.name || '—')}</h3>
+              <p class="text-muted" style="margin:2px 0 0 0;font-size:0.85rem;">${escapeHtml(p.email)} | ${escapeHtml(p.phone || 'No phone')}</p>
+              <span class="badge-status ${p.accountStatus === 'suspended' ? 'badge-suspended' : 'badge-active'}" style="margin-top:4px;">${p.accountStatus || 'active'}</span>
+            </div>
+          </div>
 
-          try {
-            await apiFetch(`/auth/investors/${id}/suspend`, { method: 'PUT' });
-            showToast(`Investor ${action}d successfully`, 'success');
-            await loadInvestors();
-            // Re-apply search filter if active
-            const q = document.getElementById('search-input').value.toLowerCase().trim();
-            if (q) {
-              const filtered = investors.filter(inv =>
-                (inv.name || '').toLowerCase().includes(q) ||
-                (inv.email || '').toLowerCase().includes(q)
-              );
-              render(filtered);
-            }
-          } catch (err) {
-            showToast('Failed: ' + err.message, 'error');
-          }
-        }
+          <div class="qv-kpi-grid">
+            <div class="qv-kpi-card">
+              <div class="lbl">Total Invested</div>
+              <div class="val text-accent">${formatMoney(s.totalInvested)}</div>
+            </div>
+            <div class="qv-kpi-card">
+              <div class="lbl">Total Shares</div>
+              <div class="val">${s.totalShares}</div>
+            </div>
+            <div class="qv-kpi-card">
+              <div class="lbl">Total Profit</div>
+              <div class="val text-success">${formatMoney(s.totalProfitEarned)}</div>
+            </div>
+            <div class="qv-kpi-card">
+              <div class="lbl">Wallet Balance</div>
+              <div class="val">${formatMoney(s.walletBalance)}</div>
+            </div>
+          </div>
 
-        if (deleteBtn) {
-          const id = deleteBtn.getAttribute('data-id');
-          const name = deleteBtn.getAttribute('data-name');
+          <h4 style="margin:16px 0 8px 0;font-size:0.9rem;">Active Project Allocations (${s.projectsCount})</h4>
+          ${data.projectBreakdown && data.projectBreakdown.length ? `
+            <div class="panel" style="padding:10px;">
+              ${data.projectBreakdown.map(proj => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+                  <div>
+                    <strong>${escapeHtml(proj.projectTitle)}</strong><br>
+                    <small class="text-muted">${proj.shares} shares @ ৳${proj.profitPerShare}/share</small>
+                  </div>
+                  <strong class="text-success">${formatMoney(proj.earnedSoFar)}</strong>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<p class="text-muted" style="font-size:0.85rem;">No active project allocations.</p>'}
+        `;
+      } catch (err) {
+        body.innerHTML = `<div class="p-3 text-danger"><p>Failed to load investor details: ${escapeHtml(err.message)}</p></div>`;
+      }
+    }
 
-          const confirmed = await confirmDialog(
-            `Are you sure you want to permanently delete investor "${name}"? This action cannot be undone.`,
-            { title: 'Delete Investor', confirmText: 'Delete', danger: true }
-          );
-          if (!confirmed) return;
+    function closeDrawer() {
+      document.getElementById('drawer-overlay').classList.remove('open');
+    }
 
-          try {
-            await apiFetch(`/auth/investors/${id}`, { method: 'DELETE' });
-            showToast('Investor deleted successfully', 'success');
-            await loadInvestors();
-            // Re-apply search filter if active
-            const q = document.getElementById('search-input').value.toLowerCase().trim();
-            if (q) {
-              const filtered = investors.filter(inv =>
-                (inv.name || '').toLowerCase().includes(q) ||
-                (inv.email || '').toLowerCase().includes(q)
-              );
-              render(filtered);
-            }
-          } catch (err) {
-            showToast('Failed: ' + err.message, 'error');
-          }
-        }
-      });
-    });
+    async function toggleSuspend(id, isSuspended) {
+      const action = isSuspended ? 'activate' : 'suspend';
+      const confirmed = await confirmDialog(
+        `Are you sure you want to ${action} this investor account?`,
+        { title: `${action.toUpperCase()} Investor Account`, confirmText: action.toUpperCase(), danger: !isSuspended }
+      );
+      if (!confirmed) return;
+
+      try {
+        await apiFetch(`/auth/investors/${id}/suspend`, { method: 'PUT' });
+        showToast(`Investor account ${action}d`, 'success');
+        await fetchInvestors();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
   </script>
 </body>
 </html>

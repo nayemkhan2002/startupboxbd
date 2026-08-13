@@ -292,14 +292,31 @@ const getInvestorDashboardBundle = async (investorId, options = {}) => {
     await processDueCyclesOnce({ adminId });
   }
 
-  const [stats, ledger, summaryBase] = await Promise.all([
+  const [statsResult, ledgerResult, summaryBaseResult] = await Promise.allSettled([
     DB.investments.getPortfolioStats(investorId),
     DB.distributions.getInvestorLedger(investorId),
     DB.distributions.getInvestorSummary(investorId)
   ]);
 
-  const projectBreakdown = await buildProjectBreakdown(investorId);
-  const totalFromProjects = projectBreakdown.reduce((s, p) => s + p.earnedSoFar, 0);
+  const stats = statsResult.status === 'fulfilled' ? statsResult.value : {
+    totalInvested: 0,
+    totalShares: 0,
+    activeInvestments: 0,
+    investmentCount: 0,
+    totalReturnEarned: 0,
+    availableBalance: 0,
+    pendingWithdrawals: 0
+  };
+  const ledger = ledgerResult.status === 'fulfilled' ? ledgerResult.value : [];
+  const summaryBase = summaryBaseResult.status === 'fulfilled' ? summaryBaseResult.value : { totalEarned: 0, monthly: [] };
+
+  let projectBreakdown = [];
+  try {
+    projectBreakdown = await buildProjectBreakdown(investorId);
+  } catch (err) {
+    console.error(`buildProjectBreakdown failed for ${investorId}:`, err.message);
+  }
+  const totalFromProjects = projectBreakdown.reduce((s, p) => s + (p.earnedSoFar || 0), 0);
 
   return {
     stats: {

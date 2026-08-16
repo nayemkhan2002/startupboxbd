@@ -130,12 +130,25 @@
   flex-shrink: 0;
 }
 
-.admin-main-content {
+.admin-main-content,
+.admin-main {
   margin-left: var(--sidebar-w);
   flex-grow: 1;
   padding: 28px 32px 40px;
   width: calc(100% - var(--sidebar-w));
   min-width: 0;
+  box-sizing: border-box;
+}
+
+.admin-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .admin-page-header {
@@ -346,7 +359,8 @@
     transform: translateX(0);
   }
 
-  .admin-main-content {
+  .admin-main-content,
+  .admin-main {
     margin-left: 0;
     width: 100%;
     padding: 18px 16px 32px;

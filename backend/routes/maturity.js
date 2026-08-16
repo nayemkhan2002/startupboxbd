@@ -11,6 +11,16 @@ const {
   buildMaturityView
 } = require('../services/maturityService');
 
+// Admin: maturity counts for dashboard cards
+router.get('/counts', protect, adminOnly, async (req, res) => {
+  try {
+    const counts = await getMaturityCounts();
+    res.json(counts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Admin: diagnose why maturity list may be empty (schedules, investments, today)
 router.get('/diagnose', protect, adminOnly, async (req, res) => {
   try {

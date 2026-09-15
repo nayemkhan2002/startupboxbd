@@ -3,6 +3,7 @@ const router = express.Router();
 const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
+const { resolveWithdrawableBalance } = require('../services/profitCalculationService');
 
 // Investor: my withdrawals
 router.get('/my', protect, async (req, res) => {
@@ -53,10 +54,10 @@ router.post('/', protect, async (req, res) => {
       }
     }
 
-    const stats = await DB.investments.getPortfolioStats(req.user._id);
-    if (amt > stats.availableBalance) {
+    const { availableBalance } = await resolveWithdrawableBalance(req.user._id);
+    if (amt > availableBalance) {
       return res.status(400).json({
-        message: `Amount exceeds available balance (${stats.availableBalance})`
+        message: `Amount exceeds available balance (৳${Math.round(availableBalance).toLocaleString()})`
       });
     }
 

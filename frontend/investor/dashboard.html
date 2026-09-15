@@ -135,6 +135,40 @@
           <div class="surface-card skeleton skeleton-card"></div>
         </div>
 
+        <!-- ===== WITHDRAW SECTION ===== -->
+        <div class="panel mt-3" id="withdraw-section" style="border:2px solid var(--gold);background:linear-gradient(135deg,#fffbea,#fff9f0);">
+          <div class="panel-header flex-between flex-wrap gap-2">
+            <div>
+              <h2 style="font-size:1.15rem;color:var(--navy);">⇄ Withdraw Earnings</h2>
+              <p class="text-muted" style="font-size:0.85rem;">Request a payout from your available earned balance</p>
+            </div>
+            <div class="flex gap-2" style="align-items:center;">
+              <span style="font-size:0.85rem;color:var(--text-secondary);">Available:</span>
+              <strong class="text-success" id="dash-avail-balance" style="font-size:1.1rem;">—</strong>
+              <button type="button" class="btn btn-sm" id="dash-open-withdraw-btn" style="background:var(--gold);color:#fff;border:none;">💸 Send Withdraw Request</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Status</th>
+                  <th>Admin Note</th>
+                </tr>
+              </thead>
+              <tbody id="dash-withdrawals-table">
+                <tr><td colspan="5"><div class="empty-state" style="padding:16px;"><p>Loading…</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div style="text-align:right;padding:8px 16px 4px;">
+            <a href="/investor/withdrawals.html" class="btn btn-outline btn-sm">View All Requests →</a>
+          </div>
+        </div>
+
         <div class="panel mt-3">
           <div class="panel-header">
             <h2>Interest Submissions</h2>
@@ -159,6 +193,79 @@
   </div>
   <div id="bottom-nav"></div>
 
+  <!-- WITHDRAW MODAL -->
+  <div class="modal" id="dash-withdraw-modal" style="display:none;">
+    <div class="modal-content" style="max-width:500px;">
+      <h3 style="margin-bottom:8px;">💸 Request Money Withdrawal</h3>
+      <p class="text-muted" style="margin-bottom:18px;">Available balance: <strong id="dash-modal-available" class="text-success">৳ 0</strong></p>
+      <div id="dash-error-msg" class="error-msg" style="display:none;"></div>
+      <form id="dash-withdraw-form">
+        <div class="form-group">
+          <label for="dash-amount">Withdrawal Amount (৳)</label>
+          <input type="number" id="dash-amount" class="form-control" min="1" step="1" required placeholder="e.g. 20000">
+        </div>
+        <div class="form-group">
+          <label>Withdrawal Method</label>
+          <div class="radio-cards">
+            <label class="radio-card active" id="dash-card-bkash">
+              <input type="radio" name="dash-method" value="bkash" checked>
+              <strong>bKash</strong>
+              <span>Mobile wallet payout</span>
+            </label>
+            <label class="radio-card" id="dash-card-bank">
+              <input type="radio" name="dash-method" value="bank">
+              <strong>Bank Account</strong>
+              <span>Bank transfer payout</span>
+            </label>
+          </div>
+        </div>
+        <div id="dash-fields-bkash" class="method-fields show">
+          <div class="form-group">
+            <label>bKash Number</label>
+            <input type="text" id="dash-bkashNumber" class="form-control" placeholder="01XXXXXXXXX">
+          </div>
+          <div class="form-group">
+            <label>Account Type</label>
+            <select id="dash-bkashAccountType" class="form-control">
+              <option value="Personal">Personal</option>
+              <option value="Agent">Agent</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name</label>
+            <input type="text" id="dash-bkashName" class="form-control" placeholder="Name on bKash">
+          </div>
+        </div>
+        <div id="dash-fields-bank" class="method-fields">
+          <div class="form-group">
+            <label>Bank Name</label>
+            <input type="text" id="dash-bankName" class="form-control" placeholder="e.g. BRAC Bank">
+          </div>
+          <div class="form-group">
+            <label>Account Holder Name</label>
+            <input type="text" id="dash-bankAccountName" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Account Number</label>
+            <input type="text" id="dash-accountNumber" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Branch Name</label>
+            <input type="text" id="dash-branch" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Routing Number</label>
+            <input type="text" id="dash-routingNumber" class="form-control">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px;">
+          <button type="button" class="btn btn-outline" id="dash-cancel-withdraw">Cancel</button>
+          <button type="submit" class="btn" id="dash-submit-withdraw" style="background:var(--gold);border-color:var(--gold);">Send Withdraw Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/assets/js/api.js"></script>
   <script src="/assets/js/investor.js"></script>
   <script>
@@ -166,6 +273,72 @@
       if (!str) return '—';
       const [y, m, d] = String(str).split('-');
       return `${d}/${m}/${y}`;
+    };
+
+    // ── Withdraw section helpers ──
+    let dashAvailableBalance = 0;
+    let dashProfile = null;
+
+    const dashToggleMethod = (method) => {
+      document.getElementById('dash-fields-bkash').classList.toggle('show', method === 'bkash');
+      document.getElementById('dash-fields-bank').classList.toggle('show', method === 'bank');
+      document.getElementById('dash-card-bkash').classList.toggle('active', method === 'bkash');
+      document.getElementById('dash-card-bank').classList.toggle('active', method === 'bank');
+    };
+
+    const dashPrefillProfile = () => {
+      if (!dashProfile?.bankInfo) return;
+      const b = dashProfile.bankInfo;
+      document.getElementById('dash-bkashNumber').value = b.bkashNumber || '';
+      document.getElementById('dash-bkashAccountType').value = b.bkashAccountType || 'Personal';
+      document.getElementById('dash-bkashName').value = b.accountName || dashProfile.name || '';
+      document.getElementById('dash-bankName').value = b.bankName || '';
+      document.getElementById('dash-bankAccountName').value = b.accountName || dashProfile.name || '';
+      document.getElementById('dash-accountNumber').value = b.accountNumber || '';
+      document.getElementById('dash-branch').value = b.branch || '';
+      document.getElementById('dash-routingNumber').value = b.routingNumber || '';
+      if (b.method === 'bank') {
+        document.querySelector('input[name="dash-method"][value="bank"]').checked = true;
+        dashToggleMethod('bank');
+      }
+    };
+
+    const loadDashWithdrawals = async () => {
+      try {
+        const [stats, list] = await Promise.all([
+          apiFetch('/investments/stats'),
+          apiFetch('/withdrawals/my')
+        ]);
+        dashAvailableBalance = stats.availableBalance || 0;
+        document.getElementById('dash-avail-balance').textContent = formatMoney(dashAvailableBalance);
+        document.getElementById('dash-modal-available').textContent = formatMoney(dashAvailableBalance);
+        // Update KPI if present
+        const kpiAvail = document.getElementById('kpi-available');
+        if (kpiAvail) kpiAvail.textContent = formatMoney(dashAvailableBalance);
+
+        const tbody = document.getElementById('dash-withdrawals-table');
+        const recent = list.slice(0, 5);
+        if (!recent.length) {
+          tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:18px;"><p>No withdrawal requests yet. Click <strong>Send Withdraw Request</strong> above to get started.</p></div></td></tr>`;
+          return;
+        }
+        tbody.innerHTML = recent.map((w) => {
+          let statusClass = 'inv-status inv-status-pending';
+          if (w.status === 'approved' || w.status === 'completed') statusClass = 'inv-status inv-status-active';
+          if (w.status === 'rejected') statusClass = 'inv-status inv-status-cancelled';
+          return `
+            <tr>
+              <td data-label="Date">${formatDate(w.createdAt)}</td>
+              <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(w.amount)}</td>
+              <td data-label="Method">${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
+              <td data-label="Status"><span class="${statusClass}">${escapeHtml(w.status)}</span></td>
+              <td data-label="Admin Note"><small>${escapeHtml(w.adminNote || '—')}</small></td>
+            </tr>`;
+        }).join('');
+      } catch (err) {
+        console.error('Withdrawal section error:', err.message);
+        document.getElementById('dash-withdrawals-table').innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:16px;"><p>${escapeHtml(err.message)}</p></div></td></tr>`;
+      }
     };
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -179,6 +352,86 @@
       document.getElementById('logout-btn').addEventListener('click', logout);
       initSidebarToggle('.app-sidebar');
 
+      // ── Wire withdraw modal ──
+      const dashModal = document.getElementById('dash-withdraw-modal');
+      document.getElementById('dash-open-withdraw-btn').addEventListener('click', () => {
+        document.getElementById('dash-error-msg').style.display = 'none';
+        document.getElementById('dash-withdraw-form').reset();
+        document.querySelector('input[name="dash-method"][value="bkash"]').checked = true;
+        dashToggleMethod('bkash');
+        dashPrefillProfile();
+        dashModal.style.display = 'block';
+      });
+      document.getElementById('dash-cancel-withdraw').addEventListener('click', () => { dashModal.style.display = 'none'; });
+      dashModal.addEventListener('click', (e) => { if (e.target === dashModal) dashModal.style.display = 'none'; });
+      document.querySelectorAll('input[name="dash-method"]').forEach((el) => {
+        el.addEventListener('change', () => dashToggleMethod(el.value));
+      });
+
+      document.getElementById('dash-withdraw-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('dash-submit-withdraw');
+        const errorDiv = document.getElementById('dash-error-msg');
+        errorDiv.style.display = 'none';
+        const method = document.querySelector('input[name="dash-method"]:checked').value;
+        const amount = Number(document.getElementById('dash-amount').value);
+        if (!amount || amount <= 0) {
+          errorDiv.textContent = 'Please enter a valid withdrawal amount.';
+          errorDiv.style.display = 'block'; return;
+        }
+        if (dashAvailableBalance <= 0) {
+          errorDiv.textContent = 'You do not have any available earned returns balance to withdraw yet.';
+          errorDiv.style.display = 'block'; return;
+        }
+        if (amount > dashAvailableBalance) {
+          errorDiv.textContent = `Amount exceeds your available balance (৳${dashAvailableBalance.toLocaleString()}).`;
+          errorDiv.style.display = 'block'; return;
+        }
+        const paymentInfo = method === 'bkash'
+          ? {
+              bkashNumber: document.getElementById('dash-bkashNumber').value.trim(),
+              bkashAccountType: document.getElementById('dash-bkashAccountType').value,
+              accountName: document.getElementById('dash-bkashName').value.trim()
+            }
+          : {
+              bankName: document.getElementById('dash-bankName').value.trim(),
+              accountName: document.getElementById('dash-bankAccountName').value.trim(),
+              accountNumber: document.getElementById('dash-accountNumber').value.trim(),
+              branch: document.getElementById('dash-branch').value.trim(),
+              routingNumber: document.getElementById('dash-routingNumber').value.trim()
+            };
+        if (method === 'bkash' && (!paymentInfo.bkashNumber || !paymentInfo.accountName)) {
+          errorDiv.textContent = 'Please provide your bKash number and account holder name.';
+          errorDiv.style.display = 'block'; return;
+        }
+        if (method === 'bank' && (!paymentInfo.bankName || !paymentInfo.accountName || !paymentInfo.accountNumber)) {
+          errorDiv.textContent = 'Please provide Bank Name, Account Holder Name, and Account Number.';
+          errorDiv.style.display = 'block'; return;
+        }
+        try {
+          btn.disabled = true;
+          btn.textContent = 'Submitting…';
+          await apiFetch('/withdrawals', {
+            method: 'POST',
+            body: JSON.stringify({ amount, method, paymentInfo })
+          });
+          dashModal.style.display = 'none';
+          showToast('✅ Withdrawal request submitted! Admin will review it shortly.', 'success');
+          await loadDashWithdrawals();
+        } catch (err) {
+          errorDiv.textContent = err.message;
+          errorDiv.style.display = 'block';
+          showToast(err.message, 'error');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Send Withdraw Request';
+        }
+      });
+
+      // Load withdrawal section data
+      loadDashWithdrawals();
+
+
       const recentEl = document.getElementById('recent-investments');
       const interestsEl = document.getElementById('interests-container');
 
@@ -190,6 +443,9 @@
         apiFetch('/profile/me'),
         apiFetch('/maturity/my')
       ]);
+
+      // Store profile for withdraw modal prefill
+      if (profileRes.status === 'fulfilled') dashProfile = profileRes.value;
 
       const failures = [dashRes, investmentsRes, interestsRes, profileRes].filter(r => r.status === 'rejected');
       if (failures.length) {

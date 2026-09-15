@@ -282,6 +282,49 @@ const buildInvestorEarningsPreview = async (investorId, options = {}) => {
 };
 
 /**
+ * Withdrawable balance for manual payout + withdrawal workflow.
+ * Uses unpaid accrued schedule profit when DB returnEarned is not yet credited.
+ */
+const resolveWithdrawableBalance = async (investorId) => {
+  const [stats, breakdown, payoutRows] = await Promise.all([
+    DB.investments.getPortfolioStats(investorId),
+    buildProjectBreakdown(investorId),
+    DB.payouts.find({ investorId })
+  ]);
+
+  const fromBreakdown = breakdown.reduce((sum, p) => {
+    if (p.frequency) return sum + (Number(p.unpaidAccrued) || 0);
+    return sum + Math.max(0, (Number(p.earnedSoFar) || 0) - (Number(p.paidSoFar) || 0));
+  }, 0);
+
+  const profitPaidOut = payoutRows
+    .filter((p) => p.projectId && !p.withdrawalId)
+    .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+  const legacyNet = Math.max(
+    0,
+    (Number(stats.totalReturnEarned) || 0) - (Number(stats.totalWithdrawn) || 0) - profitPaidOut
+  );
+
+  const grossAvailable = Math.max(fromBreakdown, legacyNet);
+  const pendingWithdrawals = Number(stats.pendingWithdrawals) || 0;
+  const availableBalance = Math.max(0, grossAvailable - pendingWithdrawals);
+
+  const totalReturnEarned = Math.max(
+    Number(stats.totalReturnEarned) || 0,
+    breakdown.reduce((sum, p) => sum + (Number(p.earnedSoFar) || 0), 0)
+  );
+
+  return {
+    ...stats,
+    totalReturnEarned,
+    scheduleUnpaid: fromBreakdown,
+    grossAvailable,
+    availableBalance
+  };
+};
+
+/**
  * Full investor dashboard bundle — display-first (manual payout workflow).
  * Auto-credit via processDueCycles is opt-in (admin "Process Due" only).
  */
@@ -292,13 +335,13 @@ const getInvestorDashboardBundle = async (investorId, options = {}) => {
     await processDueCyclesOnce({ adminId });
   }
 
-  const [statsResult, ledgerResult, summaryBaseResult] = await Promise.allSettled([
-    DB.investments.getPortfolioStats(investorId),
+  const [balanceResult, ledgerResult, summaryBaseResult] = await Promise.allSettled([
+    resolveWithdrawableBalance(investorId),
     DB.distributions.getInvestorLedger(investorId),
     DB.distributions.getInvestorSummary(investorId)
   ]);
 
-  const stats = statsResult.status === 'fulfilled' ? statsResult.value : {
+  const stats = balanceResult.status === 'fulfilled' ? balanceResult.value : {
     totalInvested: 0,
     totalShares: 0,
     activeInvestments: 0,
@@ -370,5 +413,6 @@ module.exports = {
   buildScheduleView,
   buildProjectBreakdown,
   buildInvestorEarningsPreview,
+  resolveWithdrawableBalance,
   getInvestorDashboardBundle
 };

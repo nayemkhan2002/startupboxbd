@@ -53,9 +53,19 @@
           <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Menu">☰</button>
           <div>
             <h2>Withdrawal Requests</h2>
-            <p>Approve requests, send bank/bKash transfers, then mark completed with payment proof.</p>
+            <p>Review pending requests — approve them, send payment, then mark as completed with proof.</p>
           </div>
         </div>
+      </div>
+      <!-- Status filter -->
+      <div class="flex gap-2 mb-3" style="flex-wrap:wrap;align-items:center;">
+        <span style="font-size:0.88rem;color:var(--text-secondary);font-weight:600;">Filter:</span>
+        <button class="btn btn-sm filter-btn active" data-filter="">All</button>
+        <button class="btn btn-sm filter-btn" data-filter="pending" style="background:#f59e0b;color:#fff;border-color:#f59e0b;">Pending</button>
+        <button class="btn btn-sm filter-btn" data-filter="approved" style="background:#10b981;color:#fff;border-color:#10b981;">Approved</button>
+        <button class="btn btn-sm filter-btn" data-filter="processing">Processing</button>
+        <button class="btn btn-sm filter-btn" data-filter="completed" style="background:#6366f1;color:#fff;border-color:#6366f1;">Completed</button>
+        <button class="btn btn-sm filter-btn" data-filter="rejected" style="background:#ef4444;color:#fff;border-color:#ef4444;">Rejected</button>
       </div>
 
       <div class="panel">
@@ -69,6 +79,7 @@
                 <th>Method</th>
                 <th>Payment Info</th>
                 <th>Status</th>
+                <th>Action</th>
                 <th>Proof</th>
                 <th>Admin Note</th>
               </tr>
@@ -117,6 +128,7 @@
   <script src="/assets/js/admin-maturity-badge.js"></script>
   <script>
     let allWithdrawals = [];
+    let activeFilter = '';
 
     const paymentInfoHtml = (w) => {
       const p = w.paymentInfo || {};
@@ -136,14 +148,30 @@
       return `<span class="text-muted">—</span>`;
     };
 
-    const loadTable = async () => {
-      allWithdrawals = await apiFetch('/withdrawals');
+    const statusBadge = (status) => {
+      const map = { pending: '#f59e0b', approved: '#10b981', processing: '#3b82f6', completed: '#6366f1', rejected: '#ef4444' };
+      const color = map[status] || '#94a3b8';
+      return `<span style="background:${color};color:#fff;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;">${escapeHtml(status)}</span>`;
+    };
+
+    const actionHtml = (w) => {
+      if (w.status === 'completed' || w.status === 'rejected') return `<span class="text-muted" style="font-size:0.8rem;">${w.status === 'completed' ? '✔ Done' : '✖ Rejected'}</span>`;
+      if (w.status === 'pending') {
+        return `<button class="btn btn-sm approve-btn" data-id="${escapeHtml(w._id)}" style="background:#10b981;color:#fff;border:none;white-space:nowrap;">✔ Approve</button>`;
+      }
+      if (w.status === 'approved' || w.status === 'processing') {
+        return `<button class="btn btn-sm complete-btn" data-id="${escapeHtml(w._id)}" style="background:#6366f1;color:#fff;border:none;white-space:nowrap;">💳 Mark Paid</button>`;
+      }
+      return `<span class="text-muted">—</span>`;
+    };
+
+    const renderTable = (list) => {
       const tbody = document.getElementById('withdrawals-table');
-      if (!allWithdrawals.length) {
-        tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><h3>No withdrawal requests</h3></div></td></tr>`;
+      if (!list.length) {
+        tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><h3>No withdrawal requests</h3>${activeFilter ? `<p>No <strong>${activeFilter}</strong> requests found.</p>` : ''}</div></td></tr>`;
         return;
       }
-      tbody.innerHTML = allWithdrawals.map((w) => `
+      tbody.innerHTML = list.map((w) => `
         <tr>
           <td>${formatDate(w.createdAt)}</td>
           <td><strong>${escapeHtml(w.investor?.name || '—')}</strong><br><small class="text-muted">${escapeHtml(w.investor?.email || '')}</small></td>
@@ -151,16 +179,23 @@
           <td>${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
           <td>${paymentInfoHtml(w)}</td>
           <td>
-            <select class="status-select" data-id="${escapeHtml(w._id)}" data-amount="${w.amount}" data-investor="${escapeHtml(w.investor?.name || '')}" ${w.status === 'completed' ? 'disabled' : ''}>
+            <select class="status-select" data-id="${escapeHtml(w._id)}" ${w.status === 'completed' ? 'disabled' : ''} style="font-size:0.82rem;padding:5px 8px;">
               ${['pending','approved','processing','completed','rejected'].map((s) =>
                 `<option value="${s}" ${w.status === s ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </td>
+          <td>${actionHtml(w)}</td>
           <td>${proofHtml(w)}</td>
           <td>
-            <input type="text" class="form-control note-input" data-id="${escapeHtml(w._id)}" value="${escapeHtml(w.adminNote || '')}" placeholder="Add note…" style="min-width:140px;padding:8px 10px;font-size:0.85rem;">
+            <input type="text" class="form-control note-input" data-id="${escapeHtml(w._id)}" value="${escapeHtml(w.adminNote || '')}" placeholder="Add note…" style="min-width:130px;padding:6px 8px;font-size:0.82rem;">
           </td>
         </tr>`).join('');
+    };
+
+    const loadTable = async () => {
+      allWithdrawals = await apiFetch('/withdrawals');
+      const filtered = activeFilter ? allWithdrawals.filter(w => w.status === activeFilter) : allWithdrawals;
+      renderTable(filtered);
     };
 
     const openCompleteModal = (withdrawal) => {
@@ -209,19 +244,58 @@
 
       await loadTable();
 
+      // Filter buttons
+      document.querySelectorAll('.filter-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeFilter = btn.dataset.filter;
+          const filtered = activeFilter ? allWithdrawals.filter(w => w.status === activeFilter) : allWithdrawals;
+          renderTable(filtered);
+        });
+      });
+
+      // Approve / Mark Paid button clicks (delegated)
+      document.getElementById('withdrawals-table').addEventListener('click', async (e) => {
+        // Approve button: pending -> approved
+        if (e.target.classList.contains('approve-btn')) {
+          const id = e.target.dataset.id;
+          const btn = e.target;
+          try {
+            btn.disabled = true;
+            btn.textContent = 'Approving…';
+            await apiFetch(`/withdrawals/${id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ status: 'approved' })
+            });
+            showToast('✔ Request approved! Investor will see Approved status.', 'success');
+            await loadTable();
+          } catch (err) {
+            showToast(err.message, 'error');
+            btn.disabled = false;
+            btn.textContent = '✔ Approve';
+          }
+        }
+        // Complete (Mark Paid) button
+        if (e.target.classList.contains('complete-btn')) {
+          const id = e.target.dataset.id;
+          const withdrawal = allWithdrawals.find(w => w._id === id);
+          if (withdrawal) openCompleteModal(withdrawal);
+        }
+      });
+
+      // Status dropdown change (for manual override)
       document.getElementById('withdrawals-table').addEventListener('change', async (e) => {
         if (e.target.classList.contains('status-select')) {
           const id = e.target.dataset.id;
           const newStatus = e.target.value;
           const withdrawal = allWithdrawals.find(w => w._id === id);
           if (!withdrawal) return;
-
           if (newStatus === 'completed') {
             e.target.value = withdrawal.status;
             openCompleteModal(withdrawal);
             return;
           }
-
           try {
             await apiFetch(`/withdrawals/${id}`, {
               method: 'PUT',
@@ -234,9 +308,7 @@
             loadTable();
           }
         }
-      });
-
-      document.getElementById('withdrawals-table').addEventListener('change', async (e) => {
+        // Note-input save on change
         if (e.target.classList.contains('note-input')) {
           try {
             await apiFetch(`/withdrawals/${e.target.dataset.id}`, {

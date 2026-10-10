@@ -341,16 +341,23 @@ const buildInvestorEarningsPreview = async (investorId, options = {}) => {
  * Uses unpaid accrued schedule profit when DB returnEarned is not yet credited.
  */
 const resolveWithdrawableBalance = async (investorId) => {
-  const [stats, breakdown, payoutRows] = await Promise.all([
+  const [stats, breakdown, payoutRows, withdrawals] = await Promise.all([
     DB.investments.getPortfolioStats(investorId),
     buildProjectBreakdown(investorId),
-    DB.payouts.find({ investorId })
+    DB.payouts.find({ investorId }),
+    DB.withdrawals.find({ investorId })
   ]);
 
-  const fromBreakdown = breakdown.reduce((sum, p) => {
+  // Paid withdrawals aren't tied to a project, so the per-project breakdown never
+  // sees them — take them off here or the money becomes withdrawable again.
+  const paidWithdrawals = withdrawals
+    .filter((w) => w.status === 'completed')
+    .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+
+  const fromBreakdown = Math.max(0, breakdown.reduce((sum, p) => {
     if (p.frequency) return sum + (Number(p.unpaidAccrued) || 0);
     return sum + Math.max(0, (Number(p.earnedSoFar) || 0) - (Number(p.paidSoFar) || 0));
-  }, 0);
+  }, 0) - paidWithdrawals);
 
   const profitPaidOut = payoutRows
     .filter((p) => p.projectId && !p.withdrawalId)

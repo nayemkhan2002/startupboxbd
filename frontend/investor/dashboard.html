@@ -331,7 +331,7 @@
               <td data-label="Date">${formatDate(w.createdAt)}</td>
               <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(w.amount)}</td>
               <td data-label="Method">${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
-              <td data-label="Status"><span class="${statusClass}">${escapeHtml(w.status)}</span></td>
+              <td data-label="Status"><span class="${statusClass}">${escapeHtml(wdStatusLabel(w.status))}</span></td>
               <td data-label="Admin Note"><small>${escapeHtml(w.adminNote || '—')}</small></td>
             </tr>`;
         }).join('');

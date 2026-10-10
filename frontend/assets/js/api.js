@@ -251,3 +251,16 @@ const projectCardHtml = (p, { href, cta = 'View Opportunity' } = {}) => {
 
 const skeletonCards = (n = 3) =>
   Array.from({ length: n }, () => `<div class="surface-card skeleton skeleton-card"></div>`).join('');
+
+/** Human-readable withdrawal status; "completed" means the admin has paid it. */
+const WD_STATUS_LABELS = {
+  pending: 'Pending admin approval',
+  approved: 'Approved — payment in progress',
+  processing: 'Payment in progress',
+  completed: 'Paid',
+  rejected: 'Rejected'
+};
+const wdStatusLabel = (status) => {
+  const s = String(status || 'pending').toLowerCase();
+  return WD_STATUS_LABELS[s] || s;
+};

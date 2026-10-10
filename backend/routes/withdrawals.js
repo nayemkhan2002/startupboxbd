@@ -26,6 +26,23 @@ router.get('/', protect, adminOnly, async (req, res) => {
   }
 });
 
+// Admin: counts for the sidebar notification badge
+router.get('/counts', protect, adminOnly, async (req, res) => {
+  try {
+    const list = await DB.withdrawals.find({});
+    const count = (statuses) => list.filter((w) => statuses.includes(w.status)).length;
+    const latest = list.filter((w) => w.status === 'pending')
+      .reduce((max, w) => (w.createdAt > max ? w.createdAt : max), '');
+    res.json({
+      pending: count(['pending']),
+      inProgress: count(['approved', 'processing']),
+      latestPendingAt: latest || null
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Investor: create withdrawal request
 router.post('/', protect, async (req, res) => {
   try {

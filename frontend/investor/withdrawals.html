@@ -203,7 +203,7 @@
           <td data-label="Date">${formatDate(w.createdAt)}</td>
           <td data-label="Amount" style="color:var(--gold);font-weight:700;">${formatMoney(w.amount)}</td>
           <td data-label="Method">${w.method === 'bkash' ? 'bKash' : 'Bank'}</td>
-          <td data-label="Status"><span class="${wdStatusClass(w.status)}">${escapeHtml(w.status)}</span></td>
+          <td data-label="Status"><span class="${wdStatusClass(w.status)}">${escapeHtml(wdStatusLabel(w.status))}</span>${w.status === 'completed' && w.completedAt ? `<br><small class="text-muted">on ${formatDate(w.completedAt)}</small>` : ''}</td>
           <td data-label="Transfer Proof">
             ${w.screenshotUrl
               ? `<a href="${escapeHtml(w.screenshotUrl)}" target="_blank" class="btn btn-outline btn-sm">View Receipt</a>`

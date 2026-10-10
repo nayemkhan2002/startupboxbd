@@ -499,6 +499,7 @@
   </div>
 
   <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/admin-maturity-badge.js"></script>
   <script>
     let investorId = null;
     let data360 = null;
@@ -666,7 +667,7 @@
           <td><span style="font-family:monospace;">${w._id}</span></td>
           <td><strong>${formatMoney(w.amount)}</strong></td>
           <td>${escapeHtml(w.paymentMethod || 'bKash')}</td>
-          <td><span class="badge-status ${w.status === 'completed' ? 'badge-active' : 'badge-suspended'}">${w.status}</span></td>
+          <td><span class="badge-status ${w.status === 'completed' ? 'badge-active' : 'badge-suspended'}">${escapeHtml(wdStatusLabel(w.status))}</span></td>
           <td>${w.createdAt ? new Date(w.createdAt).toLocaleDateString() : '—'}</td>
         </tr>
       `).join('');

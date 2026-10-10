@@ -11,6 +11,7 @@ const {
   addCalendarMonths,
   getCyclePeriod,
   getCompletedCycleCount,
+  getInvestmentSchedule,
   BD_TIMEZONE
 } = require('./profitScheduleService');
 
@@ -320,7 +321,7 @@ const buildAllMaturityRows = async (asOf = new Date()) => {
 
     const investor = userMap.get(investment.investorId);
     const project = projectMap.get(investment.projectId);
-    const schedule = scheduleMap.get(investment.projectId);
+    const projectSchedule = scheduleMap.get(investment.projectId);
     const invPayoffs = payoffsByInv.get(investment._id) || [];
     const paidCycleSet = new Set(invPayoffs.map((p) => Number(p.cycleNumber)));
 
@@ -379,7 +380,9 @@ const buildAllMaturityRows = async (asOf = new Date()) => {
     }
 
     // --- Path B: existing Assign Profit schedule (most investors) ---
-    if (!schedule) continue;
+    if (!projectSchedule) continue;
+    // Cycles run from this investment's own start date, not the project's
+    const schedule = getInvestmentSchedule(projectSchedule, investment);
     const completed = getCompletedCycleCount(schedule, asOf);
     const profitPerShare = Number(schedule.profitPerShare) || 0;
     const perCycle = calcProfitAmount(shares, profitPerShare);

@@ -25,3 +25,6 @@ build/
 
 # Runtime data (lives outside deploy tree in production)
 backend/data/*.json
+
+# Local database backups (contain user PII)
+db-backups/

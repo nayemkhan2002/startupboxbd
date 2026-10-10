@@ -7,6 +7,7 @@ const {
   getTodayDateStr,
   getCyclePeriod,
   getCompletedCycleCount,
+  getInvestmentStartDate,
   processDueCyclesOnce,
   BD_TIMEZONE
 } = require('./profitScheduleService');
@@ -36,29 +37,55 @@ const settledEarned = (projectId, ledgerByProject, investmentByProject, paidByPr
     paidByProject.get(projectId) || 0
   );
 
-const buildCycleRows = (schedule, shares, completedCycles, paidSoFar) => {
-  if (!schedule || completedCycles <= 0) return [];
-  const perCycle = calcCycleProfit(shares, schedule.profitPerShare);
+/**
+ * Group an investor's investments in one project into "lots" by the date their
+ * profit starts. Each lot runs its own cycles from its own start date.
+ */
+const buildProfitLots = (schedule, investments) => {
+  const byStart = new Map();
+  for (const inv of investments) {
+    const shares = Number(inv.sharesCount) || 0;
+    if (shares <= 0) continue;
+    const startDate = getInvestmentStartDate(inv, schedule);
+    byStart.set(startDate, (byStart.get(startDate) || 0) + shares);
+  }
+  return [...byStart.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([startDate, shares]) => ({ startDate, shares }));
+};
+
+const buildCycleRows = (schedule, shares, completedCycles, paidSoFar, lots = null) => {
+  if (!schedule) return [];
+  const lotList = lots && lots.length ? lots : [{ startDate: schedule.startDate, shares }];
+  const due = [];
+  for (const lot of lotList) {
+    const lotSchedule = { ...schedule, startDate: lot.startDate };
+    const lotCompleted = lots && lots.length ? getCompletedCycleCount(lotSchedule) : completedCycles;
+    for (let cycle = 1; cycle <= lotCompleted; cycle += 1) {
+      due.push({ cycle, lot, ...getCyclePeriod(lotSchedule, cycle) });
+    }
+  }
+  // Oldest cycles are settled first by earlier payouts
+  due.sort((a, b) => a.periodEnd.localeCompare(b.periodEnd) || a.lot.startDate.localeCompare(b.lot.startDate));
+
   let remainingPaid = Number(paidSoFar) || 0;
-  const rows = [];
-  for (let cycle = 1; cycle <= completedCycles; cycle += 1) {
-    const { periodStart, periodEnd } = getCyclePeriod(schedule, cycle);
+  return due.map(({ cycle, lot, periodStart, periodEnd }) => {
+    const perCycle = calcCycleProfit(lot.shares, schedule.profitPerShare);
     const isPaid = remainingPaid >= perCycle - 0.009;
     if (isPaid) remainingPaid -= perCycle;
-    rows.push({
+    return {
       cycleNumber: cycle,
       cycleType: schedule.cycleType,
       periodStart,
       periodEnd,
       periodLabel: `${periodStart} → ${periodEnd}`,
-      shares,
+      shares: lot.shares,
       profitPerShare: Number(schedule.profitPerShare) || 0,
       amount: perCycle,
-      formula: formatEarnedFormula(shares, schedule.profitPerShare, 1),
+      formula: formatEarnedFormula(lot.shares, schedule.profitPerShare, 1),
       status: isPaid ? 'paid' : 'unpaid'
-    });
-  }
-  return rows;
+    };
+  });
 };
 
 /** Merge ledger-based and investment.returnEarned per project (max avoids under-count). */
@@ -83,21 +110,44 @@ const formatEarnedFormula = (shares, profitPerShare, cycles) => {
   return `${cycles} × (${shares} × ৳${Number(profitPerShare).toLocaleString('en-US')}) = ৳${(perCycle * cycles).toLocaleString('en-US')}`;
 };
 
-const buildScheduleView = (schedule, investorShares, settledAmount = 0, asOf = new Date()) => {
+const buildScheduleView = (schedule, investorShares, settledAmount = 0, asOf = new Date(), lots = null) => {
   if (!schedule || investorShares <= 0) return null;
 
-  const completedCycles = getCompletedCycleCount(schedule, asOf);
-  const earningCycleNumber = completedCycles + 1;
-  const current = getCyclePeriod(schedule, earningCycleNumber);
+  // Each lot earns from its own start date; without lots everything follows the schedule.
+  const lotViews = (lots && lots.length ? lots : [{ startDate: schedule.startDate, shares: investorShares }])
+    .map((lot) => {
+      const lotSchedule = { ...schedule, startDate: lot.startDate };
+      const completed = getCompletedCycleCount(lotSchedule, asOf);
+      return {
+        shares: lot.shares,
+        completed,
+        current: getCyclePeriod(lotSchedule, completed + 1),
+        lastCompleted: completed > 0 ? getCyclePeriod(lotSchedule, completed) : null
+      };
+    });
+
+  // The lot whose running cycle ends soonest drives the "current cycle" display
+  const currentLot = lotViews.reduce((a, b) => (b.current.periodEnd < a.current.periodEnd ? b : a));
+  const completedCycles = Math.max(...lotViews.map((l) => l.completed));
+  const earningCycleNumber = currentLot.completed + 1;
+  const current = currentLot.current;
   const todayStr = getTodayDateStr(asOf);
 
   const perCycleProfit = calcCycleProfit(investorShares, schedule.profitPerShare);
-  const accruedEarned = perCycleProfit * completedCycles;
+  const accruedEarned = lotViews.reduce(
+    (sum, l) => sum + calcCycleProfit(l.shares, schedule.profitPerShare) * l.completed, 0);
 
-  let lastCompletedPeriod = null;
-  if (completedCycles > 0) {
-    lastCompletedPeriod = getCyclePeriod(schedule, completedCycles);
-  }
+  const lastCompletedPeriod = lotViews
+    .map((l) => l.lastCompleted)
+    .filter(Boolean)
+    .reduce((a, b) => (!a || b.periodEnd > a.periodEnd ? b : a), null);
+
+  const earnedFormula = lotViews.length === 1
+    ? formatEarnedFormula(investorShares, schedule.profitPerShare, completedCycles)
+    : lotViews
+      .filter((l) => l.completed > 0)
+      .map((l) => formatEarnedFormula(l.shares, schedule.profitPerShare, l.completed))
+      .join(' + ') || null;
 
   const unpaidAccrued = Math.max(0, accruedEarned - (Number(settledAmount) || 0));
   const dueNow = unpaidAccrued > 0.009;
@@ -116,7 +166,7 @@ const buildScheduleView = (schedule, investorShares, settledAmount = 0, asOf = n
     expectedProfitPerCycle: perCycleProfit,
     completedCycles,
     accruedEarned,
-    earnedFormula: formatEarnedFormula(investorShares, schedule.profitPerShare, completedCycles),
+    earnedFormula,
     lastCompletedPeriod,
     currentCycleNumber: earningCycleNumber,
     currentCyclePeriod: currentCycleLabel,
@@ -150,6 +200,7 @@ const buildProjectBreakdown = async (investorId, asOf = new Date()) => {
 
   const investmentByProject = new Map();
   const sharesByProject = new Map();
+  const investmentsByProject = new Map();
   const projectMeta = new Map();
 
   for (const inv of investments) {
@@ -158,6 +209,8 @@ const buildProjectBreakdown = async (investorId, asOf = new Date()) => {
     const shares = Number(inv.sharesCount) || 0;
     if (shares <= 0) continue;
     sharesByProject.set(pid, (sharesByProject.get(pid) || 0) + shares);
+    if (!investmentsByProject.has(pid)) investmentsByProject.set(pid, []);
+    investmentsByProject.get(pid).push(inv);
     investmentByProject.set(pid, (investmentByProject.get(pid) || 0) + (Number(inv.returnEarned) || 0));
     if (!projectMeta.has(pid) && inv.project) {
       projectMeta.set(pid, {
@@ -186,7 +239,8 @@ const buildProjectBreakdown = async (investorId, asOf = new Date()) => {
     const schedule = scheduleByProject.get(projectId);
     const meta = projectMeta.get(projectId) || {};
     const paidSoFar = settledEarned(projectId, ledgerByProject, investmentByProject, paidByProject);
-    const scheduleView = schedule ? buildScheduleView(schedule, shares, paidSoFar, asOf) : null;
+    const profitLots = schedule ? buildProfitLots(schedule, investmentsByProject.get(projectId) || []) : [];
+    const scheduleView = schedule ? buildScheduleView(schedule, shares, paidSoFar, asOf, profitLots) : null;
 
     let projectTitle = meta.projectTitle || 'Project';
     if (schedule && !meta.projectTitle) {
@@ -223,6 +277,7 @@ const buildProjectBreakdown = async (investorId, asOf = new Date()) => {
       nextPayoutDate: scheduleView ? scheduleView.nextPayoutDate : null,
       expectedNextPayout: scheduleView ? scheduleView.expectedProfitPerCycle : null,
       dueNow: scheduleView ? scheduleView.dueNow : false,
+      profitLots,
       scheduleStatus: schedule ? schedule.status : 'none'
     });
   }
@@ -250,7 +305,7 @@ const buildInvestorEarningsPreview = async (investorId, options = {}) => {
   const enriched = filtered.map((p) => {
     const schedule = scheduleByProject.get(p.projectId);
     const cycles = schedule
-      ? buildCycleRows(schedule, p.shares, p.completedCycles || 0, p.paidSoFar || 0)
+      ? buildCycleRows(schedule, p.shares, p.completedCycles || 0, p.paidSoFar || 0, p.profitLots)
       : [];
     const unpaidCycles = cycles.filter(c => c.status === 'unpaid');
     return {
@@ -409,6 +464,7 @@ module.exports = {
   calcCycleProfit,
   mergeProjectEarned,
   getPaidByProject,
+  buildProfitLots,
   buildCycleRows,
   buildScheduleView,
   buildProjectBreakdown,

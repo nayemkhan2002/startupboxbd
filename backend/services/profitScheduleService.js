@@ -93,6 +93,22 @@ const getCompletedCycleCount = (schedule, asOf = new Date()) => {
   return count;
 };
 
+/**
+ * First day an investment earns profit: its own start date (maturityStartDate /
+ * startDate), never earlier than the project schedule's start. Investments with
+ * no date of their own follow the schedule (the original Aug 3 investors).
+ */
+const getInvestmentStartDate = (investment, schedule) => {
+  const own = investment && (investment.maturityStartDate || investment.startDate);
+  const ownDay = own ? String(own).slice(0, 10) : null;
+  if (!schedule) return ownDay;
+  return ownDay && ownDay > schedule.startDate ? ownDay : schedule.startDate;
+};
+
+/** The project schedule re-anchored so cycle 1 starts on this investment's own start date. */
+const getInvestmentSchedule = (schedule, investment) =>
+  ({ ...schedule, startDate: getInvestmentStartDate(investment, schedule) });
+
 const getNextDueDate = (schedule) => {
   const nextCycle = (schedule.cyclesProcessed || 0) + 1;
   return getCyclePeriod(schedule, nextCycle).periodEnd;
@@ -204,6 +220,8 @@ module.exports = {
   getDueCycleNumbers,
   getCompletedCycleCount,
   getCyclePeriod,
+  getInvestmentStartDate,
+  getInvestmentSchedule,
   isCycleDue,
   getNextDueDate,
   getNextPeriodStart,

@@ -12,6 +12,12 @@ const {
   ProfitDistribution, ProfitSchedule, InvestorProfitLedger, AuditLog, Wallet, MaturityPayoff
 } = require('./models');
 
+// True when an investment's own profit start date is after `day` (YYYY-MM-DD).
+const startsAfter = (investment, day) => {
+  const own = investment.maturityStartDate || investment.startDate;
+  return Boolean(own) && String(own).slice(0, 10) > day;
+};
+
 const stripPassword = (user) => {
   if (!user) return null;
   const { password, ...rest } = user;
@@ -1053,11 +1059,15 @@ const DB = {
      * Preview distribution — read-only, no DB writes.
      * Fetches all investments for the project and calculates per-investor profit.
      */
-    preview: async (projectId, profitPerShare) => {
-      const investments = await Investment.find({
+    preview: async (projectId, profitPerShare, periodStart = null) => {
+      const found = await Investment.find({
         projectId,
         status: { $in: ['active', 'completed'] }
       }).lean();
+      // A scheduled cycle only pays investments that had started by the cycle's first day
+      const investments = periodStart
+        ? found.filter(i => !startsAfter(i, periodStart))
+        : found;
 
       if (!investments.length) return { investors: [], totalShares: 0, totalInvestors: 0, grandTotal: 0 };
 
@@ -1248,7 +1258,7 @@ const DB = {
         periodStart, periodEnd, month, year, adminId, distributionDate
       } = payload;
 
-      const preview = await DB.distributions.preview(projectId, profitPerShare);
+      const preview = await DB.distributions.preview(projectId, profitPerShare, periodStart);
       if (!preview.investors.length) return null;
 
       // Ledger is the source of truth — if this cycle was already paid, return

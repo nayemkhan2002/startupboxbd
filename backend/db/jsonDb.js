@@ -55,6 +55,12 @@ const withCycleLock = async (key, fn) => {
 
 const generateId = () => Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
 
+// True when an investment's own profit start date is after `day` (YYYY-MM-DD).
+const startsAfter = (investment, day) => {
+  const own = investment.maturityStartDate || investment.startDate;
+  return Boolean(own) && String(own).slice(0, 10) > day;
+};
+
 const stripPassword = (user) => {
   if (!user) return null;
   const { password, ...rest } = user;
@@ -1058,10 +1064,12 @@ const DB = {
 
   // ─── Profit Distribution System ─────────────────────────────
   distributions: {
-    preview: async (projectId, profitPerShare) => {
+    preview: async (projectId, profitPerShare, periodStart = null) => {
       const allInvestments = readCollection('investments');
+      // A scheduled cycle only pays investments that had started by the cycle's first day
       const investments = allInvestments.filter(i =>
-        i.projectId === projectId && ['active', 'completed'].includes(i.status)
+        i.projectId === projectId && ['active', 'completed'].includes(i.status) &&
+        !(periodStart && startsAfter(i, periodStart))
       );
 
       if (!investments.length) return { investors: [], totalShares: 0, totalInvestors: 0, grandTotal: 0 };
@@ -1235,7 +1243,7 @@ const DB = {
       } = payload;
 
       return withCycleLock(`${scheduleId}:${cycleNumber}`, async () => {
-        const preview = await DB.distributions.preview(projectId, profitPerShare);
+        const preview = await DB.distributions.preview(projectId, profitPerShare, periodStart);
         if (!preview.investors.length) return null;
 
         const distributions = readCollection('distributions');

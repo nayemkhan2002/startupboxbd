@@ -4,7 +4,7 @@ const DB = require('../db');
 const { protect } = require('../middleware/auth');
 const { adminOnly } = require('../middleware/adminOnly');
 const { buildProjectBreakdown, resolveWithdrawableBalance } = require('../services/profitCalculationService');
-const { initMaturityFields } = require('../services/maturityService');
+const { initMaturityFields, getMaturityCyclePeriod } = require('../services/maturityService');
 
 // Investor: my investments
 router.get('/my', protect, async (req, res) => {
@@ -134,8 +134,21 @@ router.post('/', protect, adminOnly, async (req, res) => {
 // Admin: update investment
 router.put('/:id', protect, adminOnly, async (req, res) => {
   try {
-    const updated = await DB.investments.findByIdAndUpdate(req.params.id, req.body);
+    let updated = await DB.investments.findByIdAndUpdate(req.params.id, req.body);
     if (!updated) return res.status(404).json({ message: 'Investment not found' });
+
+    // Keep stored maturity dates in step with an edited start date / type
+    if (updated.maturityEnabled && updated.maturityType) {
+      const cycle = (Number(updated.maturityCyclesPaid) || 0) + 1;
+      const period = getMaturityCyclePeriod(updated, cycle);
+      if (period && (period.maturityDate !== updated.nextMaturityDate || updated.currentMaturityCycle !== cycle)) {
+        updated = await DB.investments.findByIdAndUpdate(req.params.id, {
+          currentMaturityCycle: cycle,
+          nextMaturityDate: period.maturityDate,
+          maturityDate: period.maturityDate
+        });
+      }
+    }
     const [populated] = await DB.investments.populateAll([updated]);
     res.json(populated);
   } catch (err) {

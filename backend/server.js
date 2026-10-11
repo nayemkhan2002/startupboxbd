@@ -1,3 +1,9 @@
+// The hosting account has a small process/thread limit (CloudLinux NPROC) that
+// every Node thread counts against. libuv's default pool of 4 threads per app
+// instance helped exhaust it, which blocked SSH deploys and cPanel. Two threads
+// are plenty for this app's bcrypt/DNS/file work. Must be set before any async I/O.
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '2';
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');

@@ -55,25 +55,9 @@ router.post('/login', async (req, res) => {
 });
 
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
+const { sendMail } = require('../services/mailer');
 
-const sendResetEmail = async (email, resetUrl) => {
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-      port: Number(process.env.EMAIL_PORT) || 587,
-      secure: Number(process.env.EMAIL_PORT) === 465,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-      }
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || `"Startup Box Bangladesh" <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: 'Password Reset Request — Startup Box BD',
-      html: `
+const resetEmailHtml = (resetUrl) => `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h2 style="color: #1e293b;">Password Reset Request</h2>
           <p>You requested to reset your password for your Startup Box BD account. Please click the button below to reset it:</p>
@@ -85,16 +69,39 @@ const sendResetEmail = async (email, resetUrl) => {
           <p style="font-size: 0.75rem; color: #94a3b8;">If the button doesn't work, copy and paste this URL into your browser:</p>
           <p style="font-size: 0.75rem; color: #94a3b8; word-break: break-all;">${resetUrl}</p>
         </div>
-      `
-    };
+`;
 
-    await transporter.sendMail(mailOptions);
-    console.log(`Password reset email sent to ${email}`);
-  } else {
-    console.log('\n==================================================');
-    console.log(`🔑 PASSWORD RESET LINK FOR ${email}:`);
-    console.log(resetUrl);
-    console.log('==================================================\n');
+/** Send the reset link; record the outcome in the audit log so failures are diagnosable. */
+const sendResetEmail = async (user, resetUrl) => {
+  try {
+    const result = await sendMail({
+      to: user.email,
+      subject: 'Password Reset Request — Startup Box BD',
+      html: resetEmailHtml(resetUrl)
+    });
+    if (!result.sent) {
+      console.log(`
+🔑 PASSWORD RESET LINK FOR ${user.email} (email not configured):
+${resetUrl}
+`);
+      return result;
+    }
+    console.log(`Password reset email sent to ${user.email} via ${result.via}`);
+    await DB.auditLog.create({
+      action: 'email_sent',
+      performedBy: 'system',
+      targetUserId: user._id,
+      metadata: { type: 'password_reset', via: result.via }
+    }).catch(() => {});
+    return result;
+  } catch (err) {
+    await DB.auditLog.create({
+      action: 'email_failed',
+      performedBy: 'system',
+      targetUserId: user._id,
+      metadata: { type: 'password_reset', error: String(err.message).slice(0, 1000) }
+    }).catch(() => {});
+    throw err;
   }
 };
 
@@ -119,13 +126,13 @@ router.post('/forgot-password', async (req, res) => {
       // Behind Cloudflare/Passenger req.protocol is http; use the original scheme
       const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
       const resetUrl = `${proto}://${req.get('host')}/reset-password.html?token=${token}`;
-      await sendResetEmail(user.email, resetUrl);
+      await sendResetEmail(user, resetUrl);
     }
 
     res.json({ message: 'If an account matches that email, a password reset link has been sent.' });
   } catch (err) {
     console.error('Forgot password error:', err);
-    res.status(500).json({ message: 'Server error processing forgot password request' });
+    res.status(500).json({ message: 'We could not send the reset email right now. Please try again in a few minutes.' });
   }
 });
 

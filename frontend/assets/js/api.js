@@ -34,6 +34,15 @@ const apiFetch = async (endpoint, options = {}) => {
   }
 
   if (!response.ok) {
+    // Expired or invalid login: clear it and send the user to log in again
+    // instead of leaving them on a page full of empty data.
+    if (response.status === 401 && token && !endpoint.startsWith('/auth/')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      const next = `${window.location.pathname}${window.location.search}`;
+      window.location.href = `/login.html?next=${encodeURIComponent(next)}&expired=1`;
+      throw new Error('Your session has expired. Please log in again.');
+    }
     throw new Error(data.message || 'Something went wrong');
   }
 

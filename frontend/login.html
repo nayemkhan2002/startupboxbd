@@ -48,6 +48,10 @@
 
   <script src="/assets/js/api.js"></script>
   <script>
+    if (new URLSearchParams(window.location.search).get('expired')) {
+      showToast('Your session has expired. Please log in again.', 'info');
+    }
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = document.getElementById('email').value;

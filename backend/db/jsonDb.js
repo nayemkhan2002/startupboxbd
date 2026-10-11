@@ -197,6 +197,12 @@ const DB = {
         return true;
       }) || null;
     },
+    // Emails were stored as typed, so match ignoring case and surrounding spaces
+    findByEmail: async (email) => {
+      const wanted = String(email || '').trim().toLowerCase();
+      if (!wanted) return null;
+      return readCollection('users').find(u => String(u.email || '').trim().toLowerCase() === wanted) || null;
+    },
     findById: async (id) => {
       const data = readCollection('users');
       const user = data.find(u => u._id === id);

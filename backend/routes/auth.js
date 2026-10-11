@@ -14,7 +14,7 @@ router.post('/register', async (req, res) => {
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
-    const userExists = await DB.users.findOne({ email });
+    const userExists = await DB.users.findByEmail(email);
     if (userExists) return res.status(400).json({ message: 'User already exists' });
     
     const user = await DB.users.create({ name, email, password });
@@ -34,7 +34,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await DB.users.findOne({ email });
+    const user = await DB.users.findByEmail(email);
     if (user && (await DB.users.matchPassword(password, user.password))) {
       if (user.accountStatus === 'suspended') {
         return res.status(403).json({ message: 'Your account has been suspended. Please contact support.' });
@@ -106,7 +106,7 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(400).json({ message: 'Please provide email' });
     }
 
-    const user = await DB.users.findOne({ email: email.toLowerCase() });
+    const user = await DB.users.findByEmail(email);
     if (user) {
       const token = crypto.randomBytes(20).toString('hex');
       const expireTime = Date.now() + 3600000; // 1 hour
@@ -116,7 +116,9 @@ router.post('/forgot-password', async (req, res) => {
         resetPasswordExpires: expireTime
       });
 
-      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password.html?token=${token}`;
+      // Behind Cloudflare/Passenger req.protocol is http; use the original scheme
+      const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim();
+      const resetUrl = `${proto}://${req.get('host')}/reset-password.html?token=${token}`;
       await sendResetEmail(user.email, resetUrl);
     }
 

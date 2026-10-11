@@ -168,6 +168,13 @@ const DB = {
       return User.find(q).lean();
     },
     findOne: async (query = {}) => User.findOne(query).lean(),
+    // Emails were stored as typed, so match ignoring case and surrounding spaces
+    findByEmail: async (email) => {
+      const wanted = String(email || '').trim();
+      if (!wanted) return null;
+      const escaped = wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return User.findOne({ email: new RegExp(`^\\s*${escaped}\\s*$`, 'i') }).lean();
+    },
     findById: async (id) => User.findById(id).lean(),
     create: async (userData) => {
       const doc = await User.create({

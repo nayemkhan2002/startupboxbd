@@ -123,10 +123,20 @@ jobs:
           source /tmp/log.sh
           banner "4/5 · UPLOAD TO SERVER"
           step "Transferring ${ARTIFACT_SIZE} to cPanel host"
+          SSH_TARGET="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          # Quick probe so a failure says whether SSH itself or the copy broke
+          ssh -p ${{ secrets.SSH_PORT }} "$SSH_TARGET" 'echo "ssh ok"; df -h ~ 2>/dev/null | tail -1; rm -f ~/release.tar.gz' \
+            || { echo "::error::SSH connection to the host failed"; exit 1; }
           # -O forces the legacy scp protocol: the cPanel jailed shell
           # has no SFTP subsystem, so the default mode fails.
-          scp -O -P ${{ secrets.SSH_PORT }} release.tar.gz \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/release.tar.gz
+          if ! scp -O -P ${{ secrets.SSH_PORT }} release.tar.gz "$SSH_TARGET":~/release.tar.gz; then
+            echo "scp failed — streaming the artifact over plain ssh instead"
+            ssh -p ${{ secrets.SSH_PORT }} "$SSH_TARGET" 'cat > ~/release.tar.gz' < release.tar.gz
+          fi
+          REMOTE_SIZE=$(ssh -p ${{ secrets.SSH_PORT }} "$SSH_TARGET" 'wc -c < ~/release.tar.gz' | tr -d '[:space:]')
+          LOCAL_SIZE=$(wc -c < release.tar.gz | tr -d '[:space:]')
+          [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ] \
+            || { echo "::error::Upload incomplete ($REMOTE_SIZE of $LOCAL_SIZE bytes)"; exit 1; }
           ok "Artifact delivered to ~/release.tar.gz"
 
       - name: Extract, install deps, restart

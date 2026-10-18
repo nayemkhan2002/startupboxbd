@@ -28,3 +28,6 @@ backend/data/*.json
 
 # Local database backups (contain user PII)
 db-backups/
+
+# local credentials, never commit
+ssh access.txt

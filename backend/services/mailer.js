@@ -16,8 +16,12 @@ const parseFrom = (value) => {
   const raw = String(value || '').trim();
   if (!raw) return DEFAULT_FROM;
   const m = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
-  if (m) return { name: m[1].trim() || DEFAULT_FROM.name, email: m[2].trim() };
-  return { name: DEFAULT_FROM.name, email: raw };
+  const parsed = m
+    ? { name: m[1].trim() || DEFAULT_FROM.name, email: m[2].trim() }
+    : { name: DEFAULT_FROM.name, email: raw };
+  // The cPanel Node wrapper word-splits env values, so '"Name" <a@b.c>' can
+  // arrive as just 'Name'. Anything that isn't an address falls back.
+  return /^[^\s@<>]+@[^\s@<>]+$/.test(parsed.email) ? parsed : DEFAULT_FROM;
 };
 
 const sendViaBrevoApi = async ({ to, subject, html }) => {
@@ -52,7 +56,8 @@ const sendViaSmtp = async ({ to, subject, html }) => {
   const host = process.env.EMAIL_HOST || 'smtp-relay.brevo.com';
   const configured = Number(process.env.EMAIL_PORT) || 587;
   const ports = [...new Set([configured, 2525, 465, 587])];
-  const from = process.env.EMAIL_FROM || `"${DEFAULT_FROM.name}" <${process.env.EMAIL_USER}>`;
+  const { name, email } = parseFrom(process.env.EMAIL_FROM);
+  const from = { name, address: email };
   const failures = [];
 
   for (const port of ports) {
